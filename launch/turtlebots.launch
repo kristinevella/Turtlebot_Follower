@@ -1,24 +1,39 @@
 <launch>
-  <!-- No namespace here as we will share this description. 
-       Access with slash at the beginning -->
-  <param name="robot_description"
-    command="$(find xacro)/xacro $(find turtlebot3_description)/urdf/turtlebot3_waffle_pi.urdf.xacro" />
+    <!-- No namespace here as we will share this description. 
+        Access with slash at the beginning -->
+    <param name="robot_description"
+      command="$(find xacro)/xacro $(find turtlebot3_description)/urdf/turtlebot3_waffle_pi.urdf.xacro" />
 
-  <!-- BEGIN ROBOT 1-->
-  <group ns="robot1">
-    <param name="tf_prefix" value="robot1_tf" />
-    <include file="$(find turtlebot_follower)/launch/one_turtlebot.launch" >
-      <arg name="init_pose" value="-x 1 -y 1 -z 0" />
-      <arg name="robot_name"  value="Robot1" />
-    </include>
-  </group>
+    <!-- BEGIN ROBOT 1-->
+    <group ns="robot1">
+      <param name="tf_prefix" value="robot1_tf" />
+      <include file="$(find turtlebot_follower)/launch/one_turtlebot.launch" >
+        <arg name="init_pose" value="-x 1 -y 1 -z 0" />
+        <arg name="robot_name"  value="Robot1" />
+      </include>
+    </group>
 
-  <!-- BEGIN ROBOT 2-->
-  <group ns="robot2">
-    <param name="tf_prefix" value="robot2_tf" />
-    <include file="$(find turtlebot_follower)/launch/one_turtlebot.launch" >
-      <arg name="init_pose" value="-x -1 -y 1 -z 0" />
-      <arg name="robot_name"  value="Robot2" />
+    <!-- BEGIN ROBOT 2-->
+    <group ns="robot2">
+      <param name="tf_prefix" value="robot2_tf" />
+      <include file="$(find turtlebot_follower)/launch/one_turtlebot.launch" >
+        <arg name="init_pose" value="-x -1 -y 1 -z 0" />
+        <arg name="robot_name"  value="Robot2" />
+      </include>
+    </group>
+
+  <group ns="marker">
+    <param name="tf_prefix" value="marker_tf" />
+    <include file="$(find turtlebot_follower)/launch/marker.launch" >
+      <arg name="x" value="0.0" />
+      <arg name="y" value="0.5" />
+      <arg name="z" value="0.5" />
+      <arg name="roll" value="1.57" />
+      <arg name="pitch" value="0.0" />
+      <arg name="yaw" value="0.0" />
+
+      <arg name="urdf_robot_file" value="cat '$(find turtlebot_follower)/urdf/tag36_11_00000.urdf'" />
+      <arg name="robot_name"  value="Marker" />
     </include>
   </group>
 </launch>
