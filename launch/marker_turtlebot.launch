@@ -2,8 +2,11 @@
     <arg name="robot_name"/>
     <arg name="init_pose"/>
 
+    <param name="robot_description" 
+     command="$(find xacro)/xacro $(find turtlebot_follower)/urdf/turtlebot3_waffle_pi_with_marker.urdf.xacro" />
+
     <node name="spawn_minibot_model" pkg="gazebo_ros" type="spawn_model"
-     args="$(arg init_pose) -urdf -param /robot_description -model $(arg robot_name)"
+     args="$(arg init_pose) -urdf -param robot_description -model $(arg robot_name)"
      respawn="false" output="screen" />
 
     <node pkg="robot_state_publisher" type="state_publisher" 

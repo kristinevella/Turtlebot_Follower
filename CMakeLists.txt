@@ -27,12 +27,8 @@ include_directories(
 
 # Adding the executable files for the build
 add_executable(${PROJECT_NAME}_node src/turtlebot_follower.cpp src/turtlebot_follower_node.cpp)
-add_executable(marker_attacher_node src/marker_attacher.cpp src/marker_attacher_node.cpp)
 
 # linking the libraries for successful binary genertion
 target_link_libraries(${PROJECT_NAME}_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(marker_attacher_node
   ${catkin_LIBRARIES}
 )
