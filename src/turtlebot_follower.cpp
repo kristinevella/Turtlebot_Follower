@@ -32,30 +32,27 @@ void TurtlebotFollower::runOnce()
 *******************************************************************************/
 bool TurtlebotFollower::init()
 {
-    // initialize ROS parameter
-    std::string cmd_vel_topic_name = nh_.param<std::string>("robot1/cmd_vel", "");
+  // initialize variables
+  escape_range_       = 30.0 * DEG2RAD;
+  check_forward_dist_ = 0.7;
+  check_side_dist_    = 0.6;
 
-    // initialize variables
-    escape_range_       = 30.0 * DEG2RAD;
-    check_forward_dist_ = 0.7;
-    check_side_dist_    = 0.6;
+  tb3_pose_ = 0.0;
+  prev_tb3_pose_ = 0.0;
 
-    tb3_pose_ = 0.0;
-    prev_tb3_pose_ = 0.0;
+  // initialize publishers
+  cmd_vel_pub_   = nh_.advertise<geometry_msgs::Twist>("robot1/cmd_vel", 10);
 
-    // initialize publishers
-    cmd_vel_pub_   = nh_.advertise<geometry_msgs::Twist>("robot1/cmd_vel", 10);
+  // initialize subscribers
+  laser_scan_sub_  = nh_.subscribe("robot1/scan", 10, &TurtlebotFollower::laserScanMsgCallBack, this);
+  odom_sub_ = nh_.subscribe("robot1/odom", 10, &TurtlebotFollower::odomMsgCallBack, this);
 
-    // initialize subscribers
-    laser_scan_sub_  = nh_.subscribe("robot1/scan", 10, &TurtlebotFollower::laserScanMsgCallBack, this);
-    odom_sub_ = nh_.subscribe("robot1/odom", 10, &TurtlebotFollower::odomMsgCallBack, this);
-
-    return true;
+  return true;
 }
 
 void TurtlebotFollower::odomMsgCallBack(const nav_msgs::Odometry::ConstPtr &msg)
 {
-    double siny = 2.0 * (msg->pose.pose.orientation.w * msg->pose.pose.orientation.z + msg->pose.pose.orientation.x * msg->pose.pose.orientation.y);
+  double siny = 2.0 * (msg->pose.pose.orientation.w * msg->pose.pose.orientation.z + msg->pose.pose.orientation.x * msg->pose.pose.orientation.y);
 	double cosy = 1.0 - 2.0 * (msg->pose.pose.orientation.y * msg->pose.pose.orientation.y + msg->pose.pose.orientation.z * msg->pose.pose.orientation.z);  
 
 	tb3_pose_ = atan2(siny, cosy);
