@@ -11,11 +11,34 @@ classdef turtlebot_follower
             obj.RobotCmd = rospublisher("/robot1/cmd_vel","DataFormat","struct");
             obj.OdomSub = rossubscriber("/robot1/odom","DataFormat","struct");
             obj.LidarSub = rossubscriber("/robot1/scan","DataFormat","struct");
+            obj.PoseSub = rossubscriber("/robot2/odom","DataFormat","struct");
         end
 
         function ShutdownRos(obj)
             clear
             rosshutdown
+        end
+
+        function poseMsg = PoseCallback(obj) %standin for calling pose
+            poseMsg = receive(obj.PoseSub,3);
+            pose = poseMsg.Pose.Pose;
+            x = pose.Position.X;
+            y = pose.Position.Y;
+            z = pose.Position.Z;
+            
+            % display x, y, z values
+            [x y z] 
+            
+            quat = pose.Orientation;
+            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+            
+            % display orientation
+            theta = rad2deg(angles(1))
+        end
+
+        function goalPose = GoalPoseCallback(obj, poseMsg)
+            pose = poseMsg.Pose.Pose;
+            
         end
 
         function velMsg = GenerateVelocityMessage(obj, velocities)
