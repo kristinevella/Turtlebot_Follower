@@ -3,6 +3,7 @@ classdef turtlebot_follower
         RobotCmd;
         OdomSub;
         LidarSub;
+        PoseSub;
     end
     methods
         function obj = turtlebot_follower()
@@ -31,6 +32,11 @@ classdef turtlebot_follower
             
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+
+            % Rotation matrix
+            R = [ 1-2*(quart.Y^2)-2*(quart.Z^2)        2*quart.X*quart.Y-2*quart.Z*quart.W  2*quart.X*quart.Z-2*quart.Y*quart.W; ...
+                  2*quart.X*quart.Y-2*quart.Z*quart.W  1-2*(quart.X^2)-2*(quart.Z^2)        2*quart.Y*quart.Z-2*quart.X*quart.W; ...
+                  2*quart.X*quart.Z-2*quart.Y*quart.W  2*quart.Y*quart.Z-2*quart.X*quart.W  1-2*(quart.X^2)-2*(quart.Y^2)        ]
             
             % display orientation
             theta = rad2deg(angles(1))
