@@ -20,7 +20,7 @@ classdef turtlebot_follower
             rosshutdown
         end
 
-        function poseMsg = PoseCallback(obj) %standin for calling pose
+        function [TR ,poseMsg] = PoseCallback(obj) %standin for calling pose
             poseMsg = receive(obj.PoseSub,3);
             pose = poseMsg.Pose.Pose;
             x = pose.Position.X;
@@ -33,17 +33,23 @@ classdef turtlebot_follower
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
 
-            % Rotation matrix
-            R = [ 1-2*(quart.Y^2)-2*(quart.Z^2)        2*quart.X*quart.Y-2*quart.Z*quart.W  2*quart.X*quart.Z-2*quart.Y*quart.W; ...
-                  2*quart.X*quart.Y-2*quart.Z*quart.W  1-2*(quart.X^2)-2*(quart.Z^2)        2*quart.Y*quart.Z-2*quart.X*quart.W; ...
-                  2*quart.X*quart.Z-2*quart.Y*quart.W  2*quart.Y*quart.Z-2*quart.X*quart.W  1-2*(quart.X^2)-2*(quart.Y^2)        ]
-            
             % display orientation
             theta = rad2deg(angles(1))
+
+            % Rotation matrix
+            R = [ 1-2*(quat.Y^2)-2*(quat.Z^2)        2*quat.X*quat.Y-2*quat.Z*quat.W  2*quat.X*quat.Z-2*quat.Y*quat.W; ...
+                  2*quat.X*quat.Y-2*quat.Z*quat.W  1-2*(quat.X^2)-2*(quat.Z^2)        2*quat.Y*quat.Z-2*quat.X*quat.W; ...
+                  2*quat.X*quat.Z-2*quat.Y*quat.W  2*quat.Y*quat.Z-2*quat.X*quat.W  1-2*(quat.X^2)-2*(quat.Y^2)        ];
+            
+            % Transformation Matrix
+            TR = [R(1) R(2) R(3) x;...
+                  R(4) R(5) R(6) y;...
+                  R(7) R(8) R(9) z;...
+                  0    0    0    1]
         end
 
-        function goalPose = GoalPoseCallback(obj, poseMsg)
-            pose = poseMsg.Pose.Pose;
+        function goalPose = GoalPoseCallback(obj, TR)
+            goalPose = TR+[0 0 0 0; 0 0 0 0; 0 0 0 1; 0 0 0 0];
             
         end
 
