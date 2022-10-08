@@ -4,13 +4,19 @@ classdef turtlebot_follower
         OdomSub;
         LidarSub;
         CameraRgbSub;
-        DepthSub;
 
         MarkerImg;
+        Intrinsics;
+        MarkerSize = 0.09;
     end
     methods
         function obj = turtlebot_follower()
             rosinit()
+
+            focalLength    = [554 554]; 
+            principalPoint = [320 240];
+            imageSize      = [480 640];
+            obj.Intrinsics = cameraIntrinsics(focalLength,principalPoint,imageSize); % would be better to get from camera_info topic
 
             obj.MarkerImg = rgb2gray (imread('../meshes/0.png'));
 
@@ -18,41 +24,92 @@ classdef turtlebot_follower
             obj.OdomSub = rossubscriber("/robot1/odom","DataFormat","struct");
             obj.LidarSub = rossubscriber("/robot1/scan","DataFormat","struct");
             obj.CameraRgbSub = rossubscriber("/robot1/camera/rgb/image_raw","DataFormat","struct");
-        
         end
 
         function AnalyseImage(obj)
             rgbImgMsg = RobotCameraRgbCallback(obj);
             rgbImg = rosReadImage(rgbImgMsg);
 
-            figure;
-            imshow(rgbImg)
+            %figure;
+            %imshow(rgbImg)
 
-            original = obj.MarkerImg;
-            robotCameraImage = rgb2gray (rgbImg);
+            original = imrotate(obj.MarkerImg,-90);
+            grayImage = rgb2gray(rgbImg);
+
+            refinedImage = imadjust(grayImage);
+
+            % define kernal
+            %kern=[-1 -1 -1;-1 8 -1; -1 -1 -1];
+
+            % call convolution function
+            %refinedImage = conv2(grayImage,kern);
+
+            %figure;
+            %imshowpair(original,refinedImage,'montage');
+
+            % harris corner
+            %ptsOriginal = detectHarrisFeatures(original);
+            %ptsRobotCameraImage = detectHarrisFeatures(refinedImage);
+            
+            % surf
+            %ptsOriginal = detectSURFFeatures(original);
+            %ptsRobotCameraImage = detectSURFFeatures(refinedImage);
+
+            % orb
+%             ptsOriginal = detectORBFeatures(original);
+%             ptsRobotCameraImage = detectORBFeatures(refinedImage);
+%             
+%             [featuresOriginal, validPtsOriginal] = extractFeatures(original,ptsOriginal);
+%             [featuresRobotCameraImage, validPtsRobotCameraImage] = extractFeatures(refinedImage,ptsRobotCameraImage);
+%             
+%             indexPairs = matchFeatures(featuresOriginal,featuresRobotCameraImage,"MatchThreshold",85, "Unique",true);
+%             matchedOriginal = validPtsOriginal(indexPairs(:,1));
+%             matchedDistorted = validPtsRobotCameraImage(indexPairs(:,2));
+%             
+%             figure;
+%             showMatchedFeatures(original,refinedImage,matchedOriginal,matchedDistorted,'montage');
+
+            % april tag
+            refinedImage = imlocalbrighten(refinedImage);
+            refinedImage(refinedImage >= 10) = 255; % make grey pixels white to increase contrast
+            imshow(refinedImage);
+
+            I = undistortImage(refinedImage,obj.Intrinsics,OutputView="same");
+            [id,loc,pose] = readAprilTag(refinedImage,"tag36h11", obj.Intrinsics,obj.MarkerSize)
+            
+            worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
+            for i = 1:length(pose)
+                % Get image coordinates for axes.
+                imagePoints = worldToImage(obj.inworldPoints,pose(i),obj.Intrinsics);
+            
+                % Draw colored axes.
+                I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
+                    imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+                    Color=["red","green","blue"],LineWidth=7);
+            
+                I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=25);
+            end
 
             figure;
-            imshowpair(original,robotCameraImage,'montage');
-            
-            ptsOriginal = detectSURFFeatures(original);
-            ptsRobotCameraImage = detectSURFFeatures(robotCameraImage);
-            
-            [featuresOriginal, validPtsOriginal] = extractFeatures(original,ptsOriginal);
-            [featuresRobotCameraImage, validPtsRobotCameraImage] = extractFeatures(robotCameraImage,ptsRobotCameraImage);
-            
-            indexPairs = matchFeatures(featuresOriginal,featuresRobotCameraImage);
-            matchedOriginal = validPtsOriginal(indexPairs(:,1));
-            matchedDistorted = validPtsRobotCameraImage(indexPairs(:,2));
-            
-            figure;
-            showMatchedFeatures(original,robotCameraImage,matchedOriginal,matchedDistorted,'montage');
-            
-            [tform,inlierDistorted,inlierOriginal] = estimateGeometricTransform (matchedDistorted,matchedOriginal,'similarity');
-            
-            figure;
-            showMatchedFeatures(original,robotCameraImage,inlierOriginal,inlierDistorted,'montage');
-            title('Matching point (inliers only)');
-            legend ('ptsOriginal','ptsDistorted');
+            imshow(I);
+
+            isMarker = size(indexPairs(1,1)) >= 10;
+
+            if isMarker
+                disp("Marker detected!");
+                markerLocation = matchedDistorted.Location{1};
+
+
+            else 
+                disp("Marker was not detected");
+            end
+
+            [tform,inlierDistorted,inlierOriginal] = estimateGeometricTransform2D(matchedDistorted.Location,matchedOriginal.Location,'similarity');
+
+            %figure;
+            %showMatchedFeatures(original,refinedImage,inlierOriginal,inlierDistorted,'montage');
+            %title('Matching point (inliers only)');
+            %legend ('ptsOriginal','ptsDistorted');
             
             Tinv = tform.invert.T;
             ss = Tinv(2,1);
@@ -61,7 +118,7 @@ classdef turtlebot_follower
             thetaRecovered = atan2(ss,sc)*180/pi;
             
             outputView = imref2d(size(original));
-            recovered = imwarp(robotCameraImage,tform,'OutputView',outputView);
+            recovered = imwarp(refinedImage,tform,'OutputView',outputView);
             figure;
             imshowpair(original,recovered,'montage');
         end

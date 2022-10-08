@@ -4,13 +4,19 @@ classdef turtlebot_follower
         OdomSub;
         LidarSub;
         CameraRgbSub;
-        DepthSub;
 
         MarkerImg;
+        Intrinsics;
+        MarkerSize = 0.09;
     end
     methods
         function obj = turtlebot_follower()
             rosinit()
+
+            focalLength    = [554 554]; 
+            principalPoint = [320 240];
+            imageSize      = [480 640];
+            obj.Intrinsics = cameraIntrinsics(focalLength,principalPoint,imageSize); % would be better to get from camera_info topic
 
             obj.MarkerImg = rgb2gray (imread('../meshes/0.png'));
 
@@ -18,52 +24,46 @@ classdef turtlebot_follower
             obj.OdomSub = rossubscriber("/robot1/odom","DataFormat","struct");
             obj.LidarSub = rossubscriber("/robot1/scan","DataFormat","struct");
             obj.CameraRgbSub = rossubscriber("/robot1/camera/rgb/image_raw","DataFormat","struct");
-            obj.DepthSub = rossubscriber("/robot1/camera/rgb/image_raw/compressedDepth","DataFormat","struct");
         end
 
         function AnalyseImage(obj)
             rgbImgMsg = RobotCameraRgbCallback(obj);
             rgbImg = rosReadImage(rgbImgMsg);
+            grayImage = rgb2gray(rgbImg);
+
+            % adjust the image to allow for easier detection
+            refinedImage = imadjust(grayImage);
+            refinedImage = imlocalbrighten(refinedImage);
+            refinedImage(refinedImage >= 10) = 255; % make grey pixels white to increase contrast
+            imshow(refinedImage);
+
+            % april tag     
+            I = undistortImage(rgbImg,obj.Intrinsics,OutputView="same");
+            [id,loc,pose] = readAprilTag(refinedImage,"tag36h11", obj.Intrinsics,obj.MarkerSize)
+            
+            worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
+            for i = 1:length(pose)
+                % Get image coordinates for axes.
+                imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
+            
+                % Draw colored axes.
+                I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
+                    imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+                    Color=["red","green","blue"],LineWidth=7);
+            
+                I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=25);
+            end
 
             figure;
-            imshow(rgbImg)
+            imshow(I);
 
-            original = obj.MarkerImg;
-            robotCameraImage = rgb2gray (rgbImg);
-
-            figure;
-            imshowpair(original,robotCameraImage,'montage');
-            
-            ptsOriginal = detectSURFFeatures(original);
-            ptsRobotCameraImage = detectSURFFeatures(robotCameraImage);
-            
-            [featuresOriginal, validPtsOriginal] = extractFeatures(original,ptsOriginal);
-            [featuresRobotCameraImage, validPtsRobotCameraImage] = extractFeatures(robotCameraImage,ptsRobotCameraImage);
-            
-            indexPairs = matchFeatures(featuresOriginal,featuresRobotCameraImage);
-            matchedOriginal = validPtsOriginal(indexPairs(:,1));
-            matchedDistorted = validPtsRobotCameraImage(indexPairs(:,2));
-            
-            figure;
-            showMatchedFeatures(original,robotCameraImage,matchedOriginal,matchedDistorted,'montage');
-            
-            [tform,inlierDistorted,inlierOriginal] = estimateGeometricTransform (matchedDistorted,matchedOriginal,'similarity');
-            
-            figure;
-            showMatchedFeatures(original,robotCameraImage,inlierOriginal,inlierDistorted,'montage');
-            title('Matching point (inliers only)');
-            legend ('ptsOriginal','ptsDistorted');
-            
-            Tinv = tform.invert.T;
-            ss = Tinv(2,1);
-            sc = Tinv(1,1);
-            scaleRecovered = sqrt(ss*ss+sc*sc);
-            thetaRecovered = atan2(ss,sc)*180/pi;
-            
-            outputView = imref2d(size(original));
-            recovered = imwarp(robotCameraImage,tform,'OutputView',outputView);
-            figure;
-            imshowpair(original,recovered,'montage');
+            if isempty(id)
+                disp("Marker was not detected");
+            else 
+                markerLocation = pose(length(pose));
+                disp("Marker detected at");
+                disp(markerLocation);
+            end
         end
 
         function ShutdownRos(obj)
