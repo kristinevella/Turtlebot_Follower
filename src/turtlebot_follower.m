@@ -4,6 +4,7 @@ classdef turtlebot_follower
         OdomSub;
         LidarSub;
         CameraRgbSub;
+        PoseSub;
 
         MarkerImg;
         Intrinsics;
@@ -22,6 +23,7 @@ classdef turtlebot_follower
 
             obj.RobotCmd = rospublisher("/robot1/cmd_vel","DataFormat","struct");
             obj.OdomSub = rossubscriber("/robot1/odom","DataFormat","struct");
+            obj.PoseSub = rossubscriber("/robot2/odom","DataFormat","struct");
             obj.LidarSub = rossubscriber("/robot1/scan","DataFormat","struct");
             obj.CameraRgbSub = rossubscriber("/robot1/camera/rgb/image_raw","DataFormat","struct");
         end
@@ -86,8 +88,38 @@ classdef turtlebot_follower
             end
         end
 
-        function goalPose = DetermineGoalPose(obj, pose)
-            % TODO
+        function [TR ,poseMsg] = PoseCallback(obj) %standin for calling pose
+            [markerPresent,pose] = AnalyseImage(obj);
+            pose = poseMsg.Pose.Pose;
+            x = pose.Position.X;
+            y = pose.Position.Y;
+            z = pose.Position.Z;
+            
+            % display x, y, z values
+            [x y z] 
+            
+            quat = pose.Orientation;
+            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+
+            % display orientation
+            theta = rad2deg(angles(1))
+
+            % Rotation matrix
+            R = [ 1-2*(quat.Y^2)-2*(quat.Z^2)        2*quat.X*quat.Y-2*quat.Z*quat.W  2*quat.X*quat.Z-2*quat.Y*quat.W; ...
+                  2*quat.X*quat.Y-2*quat.Z*quat.W  1-2*(quat.X^2)-2*(quat.Z^2)        2*quat.Y*quat.Z-2*quat.X*quat.W; ...
+                  2*quat.X*quat.Z-2*quat.Y*quat.W  2*quat.Y*quat.Z-2*quat.X*quat.W  1-2*(quat.X^2)-2*(quat.Y^2)        ];
+            
+            % Transformation Matrix
+            TR = [R(1) R(2) R(3) x;...
+                  R(4) R(5) R(6) y;...
+                  R(7) R(8) R(9) z;...
+                  0    0    0    1]
+        end
+
+        function goalPose = DetermineGoalPose(obj)
+            [TR ,poseMsg] = PoseCallback(obj);
+            goalPose = TR+[0 0 0 0; 0 0 0 0; 0 0 0 1; 0 0 0 0];
+            
         end
 
         function [markerPresent,pose] = AnalyseImage(obj)
