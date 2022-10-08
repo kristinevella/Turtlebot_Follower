@@ -12,7 +12,7 @@ classdef turtlebot_follower
     methods
         function obj = turtlebot_follower()
             rosinit()
-
+            
             focalLength    = [554 554]; 
             principalPoint = [320 240];
             imageSize      = [480 640];
@@ -26,61 +26,68 @@ classdef turtlebot_follower
             obj.CameraRgbSub = rossubscriber("/robot1/camera/rgb/image_raw","DataFormat","struct");
         end
 
-        function AnalyseImage(obj)
+        function FollowTheLeader(obj)
+            tic;
+            %r = rosrate(100);
+            followLeader = true;
+           
+            %reset(r);
+            while followLeader
+
+                [markerPresent, pose] = AnalyseImage(obj);
+
+                if markerPresent
+                    MoveTowardsMarker(obj, pose);
+                else
+                    % Do nothing
+                end
+
+                % stop after 5 minutes
+                if toc > 5*60
+                   followLeader = false;
+                end
+            end
+        end
+
+        function MoveTowardsMarker(obj, pose)
+            goalPose = DetermineGoalPose(obj);
+            cmdVel = DetermineCmdVelocity(obj, goalPose);
+            PublishCmdVelocity(obj, cmdVel);
+        end
+
+        function cmdVel = DetermineCmdVelocity(obj, goalPose)
+            x_l = 0;
+            y_l = 0;
+            z_l = 0;
+            x_a = 0;
+            y_a = 0;
+            z_a = 0;
+
+            cmdVel = [x_l y_l z_l x_a y_a z_a];
+        end
+
+        function goalPose = DetermineGoalPose(obj)
+        end
+
+        function [markerPresent,pose] = AnalyseImage(obj)
             rgbImgMsg = RobotCameraRgbCallback(obj);
             rgbImg = rosReadImage(rgbImgMsg);
-
-            %figure;
-            %imshow(rgbImg)
-
-            original = imrotate(obj.MarkerImg,-90);
             grayImage = rgb2gray(rgbImg);
 
+            % adjust the image to allow for easier detection
             refinedImage = imadjust(grayImage);
-
-            % define kernal
-            %kern=[-1 -1 -1;-1 8 -1; -1 -1 -1];
-
-            % call convolution function
-            %refinedImage = conv2(grayImage,kern);
-
-            %figure;
-            %imshowpair(original,refinedImage,'montage');
-
-            % harris corner
-            %ptsOriginal = detectHarrisFeatures(original);
-            %ptsRobotCameraImage = detectHarrisFeatures(refinedImage);
-            
-            % surf
-            %ptsOriginal = detectSURFFeatures(original);
-            %ptsRobotCameraImage = detectSURFFeatures(refinedImage);
-
-            % orb
-%             ptsOriginal = detectORBFeatures(original);
-%             ptsRobotCameraImage = detectORBFeatures(refinedImage);
-%             
-%             [featuresOriginal, validPtsOriginal] = extractFeatures(original,ptsOriginal);
-%             [featuresRobotCameraImage, validPtsRobotCameraImage] = extractFeatures(refinedImage,ptsRobotCameraImage);
-%             
-%             indexPairs = matchFeatures(featuresOriginal,featuresRobotCameraImage,"MatchThreshold",85, "Unique",true);
-%             matchedOriginal = validPtsOriginal(indexPairs(:,1));
-%             matchedDistorted = validPtsRobotCameraImage(indexPairs(:,2));
-%             
-%             figure;
-%             showMatchedFeatures(original,refinedImage,matchedOriginal,matchedDistorted,'montage');
-
-            % april tag
             refinedImage = imlocalbrighten(refinedImage);
             refinedImage(refinedImage >= 10) = 255; % make grey pixels white to increase contrast
-            imshow(refinedImage);
+            %imshow(refinedImage);
 
-            I = undistortImage(refinedImage,obj.Intrinsics,OutputView="same");
+            % april tag     
+            I = undistortImage(rgbImg,obj.Intrinsics,OutputView="same");
             [id,loc,pose] = readAprilTag(refinedImage,"tag36h11", obj.Intrinsics,obj.MarkerSize)
             
             worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
             for i = 1:length(pose)
                 % Get image coordinates for axes.
-                imagePoints = worldToImage(obj.inworldPoints,pose(i),obj.Intrinsics);
+                imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
             
                 % Draw colored axes.
                 I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
@@ -93,34 +100,15 @@ classdef turtlebot_follower
             figure;
             imshow(I);
 
-            isMarker = size(indexPairs(1,1)) >= 10;
-
-            if isMarker
-                disp("Marker detected!");
-                markerLocation = matchedDistorted.Location{1};
-
-
-            else 
+            if isempty(id)
+                markerPresent = false;
                 disp("Marker was not detected");
+            else 
+                markerPresent = true;
+                pose = pose(length(pose));
+                disp("Marker detected at");
+                disp(pose);
             end
-
-            [tform,inlierDistorted,inlierOriginal] = estimateGeometricTransform2D(matchedDistorted.Location,matchedOriginal.Location,'similarity');
-
-            %figure;
-            %showMatchedFeatures(original,refinedImage,inlierOriginal,inlierDistorted,'montage');
-            %title('Matching point (inliers only)');
-            %legend ('ptsOriginal','ptsDistorted');
-            
-            Tinv = tform.invert.T;
-            ss = Tinv(2,1);
-            sc = Tinv(1,1);
-            scaleRecovered = sqrt(ss*ss+sc*sc);
-            thetaRecovered = atan2(ss,sc)*180/pi;
-            
-            outputView = imref2d(size(original));
-            recovered = imwarp(refinedImage,tform,'OutputView',outputView);
-            figure;
-            imshowpair(original,recovered,'montage');
         end
 
         function ShutdownRos(obj)

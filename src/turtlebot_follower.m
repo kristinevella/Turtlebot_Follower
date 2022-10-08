@@ -12,7 +12,7 @@ classdef turtlebot_follower
     methods
         function obj = turtlebot_follower()
             rosinit()
-
+            
             focalLength    = [554 554]; 
             principalPoint = [320 240];
             imageSize      = [480 640];
@@ -26,7 +26,51 @@ classdef turtlebot_follower
             obj.CameraRgbSub = rossubscriber("/robot1/camera/rgb/image_raw","DataFormat","struct");
         end
 
-        function AnalyseImage(obj)
+        function FollowTheLeader(obj)
+            tic;
+            %r = rosrate(100);
+            followLeader = true;
+           
+            %reset(r);
+            while followLeader
+
+                [markerPresent, pose] = AnalyseImage(obj);
+
+                if markerPresent
+                    % MoveTowardsMarker(obj, pose);
+                else
+                    % Do nothing
+                end
+
+                % stop after 5 minutes
+                if toc > 5*60
+                   followLeader = false;
+                end
+            end
+        end
+
+        function MoveTowardsMarker(obj, pose)
+            goalPose = DetermineGoalPose(obj, pose);
+            cmdVel = DetermineCmdVelocity(obj, goalPose);
+            PublishCmdVelocity(obj, cmdVel);
+        end
+
+        function cmdVel = DetermineCmdVelocity(obj, goalPose)
+            x_l = 0;
+            y_l = 0;
+            z_l = 0;
+            x_a = 0;
+            y_a = 0;
+            z_a = 0; % TODO
+
+            cmdVel = [x_l y_l z_l x_a y_a z_a];
+        end
+
+        function goalPose = DetermineGoalPose(obj, pose)
+            % TODO
+        end
+
+        function [markerPresent,pose] = AnalyseImage(obj)
             rgbImgMsg = RobotCameraRgbCallback(obj);
             rgbImg = rosReadImage(rgbImgMsg);
             grayImage = rgb2gray(rgbImg);
@@ -35,7 +79,7 @@ classdef turtlebot_follower
             refinedImage = imadjust(grayImage);
             refinedImage = imlocalbrighten(refinedImage);
             refinedImage(refinedImage >= 10) = 255; % make grey pixels white to increase contrast
-            imshow(refinedImage);
+            %imshow(refinedImage);
 
             % april tag     
             I = undistortImage(rgbImg,obj.Intrinsics,OutputView="same");
@@ -58,11 +102,13 @@ classdef turtlebot_follower
             imshow(I);
 
             if isempty(id)
+                markerPresent = false;
                 disp("Marker was not detected");
             else 
-                markerLocation = pose(length(pose));
+                markerPresent = true;
+                pose = pose(length(pose));
                 disp("Marker detected at");
-                disp(markerLocation);
+                disp(pose);
             end
         end
 
