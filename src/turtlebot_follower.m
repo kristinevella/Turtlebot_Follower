@@ -56,14 +56,34 @@ classdef turtlebot_follower
         end
 
         function cmdVel = DetermineCmdVelocity(obj, goalPose)
-            x_l = 0;
-            y_l = 0;
-            z_l = 0;
-            x_a = 0;
-            y_a = 0;
-            z_a = 0; % TODO
+            cmdVel = [0 0 0 0 0 0];
+            % proportional controller
+            kp = 0.1;
 
-            cmdVel = [x_l y_l z_l x_a y_a z_a];
+            currentOdom = OdomCallback(obj);
+            currentPose = currentOdom.Pose.Pose;
+
+            quat = currentPose.Orientation;
+            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+            theta = rad2deg(angles(1));
+
+            xDiff = goalPose.Position.X - currentPose.Position.X;
+            yDiff = goalPose.Position.Y - currentPose.Position.Y;
+            angularError = atan2(yDiff,xDiff);
+
+            linearError = sqrt(pow2(goalPose.Position.X - currentPose.Position.X) ...
+                + pow2(goalPose.Position.Y - currentPose.Position.Y));
+
+            pAng = kp * angularError;
+            pLin = kp * linearError;
+
+            if abs(angularError - theta) > 0.1
+                cmdVel(1,6) = 0.3*pAng;
+            elseif linearError > 0.1
+                cmdVel(1,1) = 0.5*pLin;
+            else
+                cmdVel(1,6) = 0;
+            end
         end
 
         function goalPose = DetermineGoalPose(obj, pose)
