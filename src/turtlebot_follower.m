@@ -32,10 +32,14 @@ classdef turtlebot_follower
             tic;
             %r = rosrate(100);
             followLeader = true;
-           
+            timer = 5;
+            readAprilTagTime = timer;
+            markerPresent = 0;
             %reset(r);
             while followLeader
                 % get values from robot
+                % every ten seconds get new image
+                if toc > readAprilTagTime
                 rgbImgMsg = RobotCameraRgbCallback(obj);
 
                 currentOdom = OdomCallback(obj);
@@ -43,10 +47,17 @@ classdef turtlebot_follower
 
                 [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, robotPose);
 
+                readAprilTagTime = toc+timer;
+                disp("Image Read")
+                else
+                    % do nothing
+                end
+
                 if markerPresent
                    MoveTowardsMarker(obj, pose, robotPose);
                 else
-                    % do nothing
+                    velocities = [0,0,0,0,0,0];
+                    PublishCmdVelocity(obj, velocities); % stand still if marker not present
                 end
 
                 % stop after 5 minutes
@@ -94,7 +105,7 @@ classdef turtlebot_follower
         function goalPose = DetermineGoalPose(obj, pose)
             % pose = pose from AR Tag
             % translate this pose to be about 1m away from leader turtlebot
-            translate_x = 1;
+            translate_x = 3;
             translate_y = 0;
             translate_z = 0;
             theta = 0;
