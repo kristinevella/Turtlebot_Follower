@@ -35,13 +35,18 @@ classdef turtlebot_follower
            
             %reset(r);
             while followLeader
+                % get values from robot
+                rgbImgMsg = RobotCameraRgbCallback(obj);
 
-                [markerPresent, pose] = AnalyseImage(obj);
+                currentOdom = OdomCallback(obj);
+                robotPose = currentOdom.Pose.Pose;
+
+                [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, robotPose);
 
                 if markerPresent
-                    % MoveTowardsMarker(obj, pose);
+                   MoveTowardsMarker(obj, pose, robotPose);
                 else
-                    % Do nothing
+                    % do nothing
                 end
 
                 % stop after 5 minutes
@@ -51,19 +56,17 @@ classdef turtlebot_follower
             end
         end
 
-        function MoveTowardsMarker(obj, pose)
+        function MoveTowardsMarker(obj, pose, robotPose)
+            
             goalPose = DetermineGoalPose(obj, pose);
-            cmdVel = DetermineCmdVelocity(obj, goalPose);
+            cmdVel = DetermineCmdVelocity(obj, goalPose, robotPose); 
             PublishCmdVelocity(obj, cmdVel);
         end
 
-        function cmdVel = DetermineCmdVelocity(obj, goalPose)
+        function cmdVel = DetermineCmdVelocity(obj, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
             % proportional controller
             kp = 0.1;
-
-            currentOdom = OdomCallback(obj);
-            currentPose = currentOdom.Pose.Pose;
 
             quat = currentPose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
@@ -81,49 +84,30 @@ classdef turtlebot_follower
 
             if abs(angularError - theta) > 0.1
                 cmdVel(1,6) = 0.3*pAng;
-            elseif linearError > 0.1
+            elseif linearError > 0.5
                 cmdVel(1,1) = 0.5*pLin;
             else
                 cmdVel(1,6) = 0;
             end
         end
 
-        function [TR ,poseMsg] = PoseCallback(obj) %standin for calling pose
-            [markerPresent,pose] = AnalyseImage(obj);
-            pose = poseMsg.Pose.Pose;
-            x = pose.Position.X;
-            y = pose.Position.Y;
-            z = pose.Position.Z;
-            
-            % display x, y, z values
-            [x y z] 
-            
-            quat = pose.Orientation;
-            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+        function goalPose = DetermineGoalPose(obj, pose)
+            % pose = pose from AR Tag
+            % translate this pose to be about 1m away from leader turtlebot
+            translate_x = 1;
+            translate_y = 0;
+            translate_z = 0;
+            theta = 0;
 
-            % display orientation
-            theta = rad2deg(angles(1))
-
-            % Rotation matrix
-            R = [ 1-2*(quat.Y^2)-2*(quat.Z^2)        2*quat.X*quat.Y-2*quat.Z*quat.W  2*quat.X*quat.Z-2*quat.Y*quat.W; ...
-                  2*quat.X*quat.Y-2*quat.Z*quat.W  1-2*(quat.X^2)-2*(quat.Z^2)        2*quat.Y*quat.Z-2*quat.X*quat.W; ...
-                  2*quat.X*quat.Z-2*quat.Y*quat.W  2*quat.Y*quat.Z-2*quat.X*quat.W  1-2*(quat.X^2)-2*(quat.Y^2)        ];
-            
-            % Transformation Matrix
-            TR = [R(1) R(2) R(3) x;...
-                  R(4) R(5) R(6) y;...
-                  R(7) R(8) R(9) z;...
-                  0    0    0    1]
+            % convert from rigid3d to ros Pose
+            goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
+            goalPose.Position.X = pose(1,4)+translate_x;
+            goalPose.Position.Y = pose(2,4)+translate_y;
+            goalPose.Position.Z = pose(3,4)+translate_z;
+            goalPose.Orientation = rotm2quat(pose(1:3,1:3));
         end
 
-        function goalPose = DetermineGoalPose(obj)
-            [TR ,poseMsg] = PoseCallback(obj);
-            goalPose = TR+[0 0 0 0; 0 0 0 0; 0 0 0 1; 0 0 0 0];
-            
-        end
-
-        function [markerPresent,pose] = AnalyseImage(obj)
-            rgbImgMsg = RobotCameraRgbCallback(obj);
+        function [markerPresent,worldPose] = AnalyseImage(obj, rgbImgMsg, robotPose)
             rgbImg = rosReadImage(rgbImgMsg);
             grayImage = rgb2gray(rgbImg);
 
@@ -137,30 +121,64 @@ classdef turtlebot_follower
             I = undistortImage(rgbImg,obj.Intrinsics,OutputView="same");
             [id,loc,pose] = readAprilTag(refinedImage,"tag36h11", obj.Intrinsics,obj.MarkerSize)
             
-            worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
-            for i = 1:length(pose)
-                % Get image coordinates for axes.
-                imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
-            
-                % Draw colored axes.
-                I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
-                    imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
-                    Color=["red","green","blue"],LineWidth=7);
-            
-                I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=25);
-            end
-
-            figure;
-            imshow(I);
-
             if isempty(id)
                 markerPresent = false;
+                worldPose = pose;
                 disp("Marker was not detected");
             else 
+                % rotate axis to coinside with robot frame
+                rotation = eul2rotm([0 0 -pi/2]);
+                tform = rigid3d(rotation,[0 0 0]);
+                updatedR = pose.Rotation * tform.Rotation;
+                pose = rigid3d(updatedR, pose.Translation);
+
+                % display tag axis
+                worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
+                %for i = 1:length(pose)
+                i = 1
+                    % Get image coordinates for axes.
+                    imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
+                
+                    % Draw colored axes.
+                    I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
+                        imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+                        Color=["red","green","blue"],LineWidth=7);
+                
+                    I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=12);
+                %end
+    
+                % find central tag image point
+                uMin = min(loc(:,1));
+                uMax = max(loc(:,1));
+                vMin = min(loc(:,2));
+                vMax = max(loc(:,2));
+    
+                centerPoint = [mean([uMax uMin]) mean([vMax vMin])];
+                I = insertMarker(I,centerPoint,"circle","Size",10);
+    
+                figure(1);
+                imshow(I);
+    
+                % convert image point to 3d points
+                depth = 0; % get from sensor
+                translation = [depth ...
+                    depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1)/obj.Intrinsics.FocalLength(1)) ...
+                    depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2)/obj.Intrinsics.FocalLength(2))];
+
+                poseM = eul2rotm([0 0 0]);
+                poseM(1:3,4) = translation';
+                poseM(4,4) = 1;
+    
+                quat = robotPose.Orientation;
+                worldPoseTr = quat2rotm([quat.W quat.X quat.Y quat.Z]);
+                worldPoseTr(1:3,4) = [robotPose.Position.X;robotPose.Position.Y;robotPose.Position.Z];
+                worldPoseTr(4,4) = 1;
+    
+                worldPose = inv(worldPoseTr) * poseM;
+
                 markerPresent = true;
-                pose = pose(length(pose));
                 disp("Marker detected at");
-                disp(pose);
+                disp(worldPose);
             end
         end
 
