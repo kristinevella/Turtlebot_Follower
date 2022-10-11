@@ -90,12 +90,15 @@ classdef turtlebot_follower
             thetaGoal = rad2deg(angles(1));
 
             quatCurrent = currentPose.Orientation;
-            angles = quatCurrent2eul([quatCurrent.W quatCurrent.X quatCurrent.Y quatCurrent.Z]);
+            angles = quat2eul([quatCurrent.W quatCurrent.X quatCurrent.Y quatCurrent.Z]);
             thetaCurrent = rad2deg(angles(1));
 
-            xDiff = goalPose.Position.X - currentPose.Position.X;
-            yDiff = goalPose.Position.Y - currentPose.Position.Y;
-            angularError = atan2(yDiff,xDiff);
+            xDiff = goalPose.Position.X - currentPose.Position.X
+            yDiff = goalPose.Position.Y - currentPose.Position.Y
+            angularError = rad2deg(atan2(yDiff,xDiff));
+            direction1 = (angularError-thetaCurrent)/(abs(angularError-thetaCurrent));
+            direction2 = xDiff/abs(xDiff);
+            direction3 = (thetaGoal-thetaCurrent)/(abs(thetaGoal-thetaCurrent));
 
             if abs(xDiff)<0.05 && abs(yDiff)<0.05
                 if abs(thetaGoal-thetaCurrent)<1
@@ -105,17 +108,17 @@ classdef turtlebot_follower
                 else
                     % at goal and not facing correct direction
                     % spin to correct direction
-                    cmdVel = [0 0 0 0 0 0.3];
+                    cmdVel = [0 0 0 0 0 direction3*0.3];
                 end
             else
-                if abs(rad2deg(angularError)-thetaCurrent)<1
+                if abs(angularError-thetaCurrent)<1
                     % facing direction of goal but not there yet
                     % drive towards goal
-                    cmdVel = [0.5 0 0 0 0 0];
+                    cmdVel = [direction2*0.5 0 0 0 0 0];
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
-                    cmdVel = [0 0 0 0 0 0.3];
+                    cmdVel = [0 0 0 0 0 direction1*0.3];
                 end
             end
 
@@ -270,7 +273,7 @@ classdef turtlebot_follower
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
             
             % display orientation
-            theta = rad2deg(angles(1))
+            theta = rad2deg(angles(1));
         end
 
         function poseMsg = PoseCallback(obj) %standin for calling pose
