@@ -5,6 +5,7 @@ classdef turtlebot_follower
         OdomSub;
         LidarSub;
         CameraRgbSub;
+        DepthSub;
         PoseSub;
 
         MarkerImg;
@@ -27,6 +28,7 @@ classdef turtlebot_follower
             obj.PoseSub = rossubscriber("/robot2/odom","DataFormat","struct");
             obj.LidarSub = rossubscriber("/robot1/scan","DataFormat","struct");
             obj.CameraRgbSub = rossubscriber("/robot1/camera/rgb/image_raw","DataFormat","struct");
+            obj.DepthSub = rossubscriber("/robot1/camera/depth/image_raw","DataFormat","struct");
         end
 
         function FollowTheLeader(obj)
@@ -41,12 +43,12 @@ classdef turtlebot_follower
                 % get values from robot
                 % every ten seconds get new image
                 if toc > readAprilTagTime
-                rgbImgMsg = RobotCameraRgbCallback(obj);
-
+                rgbImgMsg = CameraRgbCallback(obj);
+                depthMsg = CameraDepthCallback(obj);
                 currentOdom = OdomCallback(obj);
                 robotPose = currentOdom.Pose.Pose;
 
-                [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, robotPose);
+                [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, depthMsg, robotPose);
 
                 readAprilTagTime = toc+timer;
                 disp("Image Read")
@@ -60,7 +62,7 @@ classdef turtlebot_follower
                     currentLeaderPose = PoseCallback(obj);
                     leaderPose = currentLeaderPose.Pose.Pose;
                     
-                   MoveTowardsMarker(obj, leaderPose, robotPose); % leaderPose is temporary, change back to pose when done
+                    MoveTowardsMarker(obj, leaderPose, robotPose); % leaderPose is temporary, change back to pose when done
                 else
                     velocities = [0,0,0,0,0,0];
                     PublishCmdVelocity(obj, velocities); % stand still if marker not present
@@ -157,7 +159,7 @@ classdef turtlebot_follower
             goalPose.Orientation = pose.Orientation;
         end
 
-        function [markerPresent,worldPose] = AnalyseImage(obj, rgbImgMsg, robotPose)
+        function [markerPresent,worldPose] = AnalyseImage(obj, rgbImgMsg, depthMsg, robotPose)
             rgbImg = rosReadImage(rgbImgMsg);
             grayImage = rgb2gray(rgbImg);
 
@@ -203,17 +205,18 @@ classdef turtlebot_follower
                 vMin = min(loc(:,2));
                 vMax = max(loc(:,2));
     
-                centerPoint = [mean([uMax uMin]) mean([vMax vMin])];
-                I = insertMarker(I,centerPoint,"circle","Size",10);
+                centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))];
+                I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
     
                 figure(1);
                 imshow(I);
     
                 % convert image point to 3d points
-                depth = 0; % get from sensor
+                depthImg = rosReadImage(depthMsg);
+                depth = depthImg(centerPoint(1),centerPoint(2)); % get from sensor
                 translation = [depth ...
-                    depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1)/obj.Intrinsics.FocalLength(1)) ...
-                    depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2)/obj.Intrinsics.FocalLength(2))];
+                    depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1))/obj.Intrinsics.FocalLength(1) ...
+                    depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2))/obj.Intrinsics.FocalLength(2)];
 
                 poseM = eul2rotm([0 0 0]);
                 poseM(1:3,4) = translation';
@@ -252,8 +255,12 @@ classdef turtlebot_follower
             send(obj.RobotCmd,velMsg)
         end
 
-        function rbgImgMsg = RobotCameraRgbCallback(obj)
+        function rbgImgMsg = CameraRgbCallback(obj)
             rbgImgMsg = receive(obj.CameraRgbSub);
+        end
+
+        function depthMsg = CameraDepthCallback(obj)
+            depthMsg = receive(obj.DepthSub);
         end
 
         function odomMsg = OdomCallback(obj)
@@ -290,7 +297,7 @@ classdef turtlebot_follower
             theta = rad2deg(angles(1));
         end
 
-        function LidarCallback(obj)
+        function scanMsg = LidarCallback(obj)
             scanMsg = receive(obj.LidarSub);
             figure(1)
             rosPlot(scanMsg)
