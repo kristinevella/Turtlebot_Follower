@@ -1,3 +1,4 @@
+
 classdef turtlebot_follower
     properties
         RobotCmd;
@@ -44,6 +45,8 @@ classdef turtlebot_follower
 
                 currentOdom = OdomCallback(obj);
                 robotPose = currentOdom.Pose.Pose;
+                currentLeaderPose = PoseCallback(obj);
+                leaderPose = currentLeaderPose.Pose.Pose;
 
                 [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, robotPose);
 
@@ -54,7 +57,7 @@ classdef turtlebot_follower
                 end
 
                 if markerPresent
-                   MoveTowardsMarker(obj, pose, robotPose);
+                   MoveTowardsMarker(obj, leaderPose, robotPose); % leaderPose is temporary, change back to pose when done
                 else
                     velocities = [0,0,0,0,0,0];
                     PublishCmdVelocity(obj, velocities); % stand still if marker not present
@@ -112,10 +115,12 @@ classdef turtlebot_follower
 
             % convert from rigid3d to ros Pose
             goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
-            goalPose.Position.X = pose(1,4)+translate_x;
-            goalPose.Position.Y = pose(2,4)+translate_y;
-            goalPose.Position.Z = pose(3,4)+translate_z;
-            goalPose.Orientation = rotm2quat(pose(1:3,1:3));
+            goalPose.Position.X = pose.Position.X +translate_x;
+            goalPose.Position.Y = pose.Position.Y +translate_y;
+            goalPose.Position.Z = pose.Position.Z +translate_z;
+%             goalPose.Orientation = rotm2quat(pose(1:3,1:3));  % Add back
+%             in later when using AnalyseImage
+            goalPose.Orientation = pose.Orientation;
         end
 
         function [markerPresent,worldPose] = AnalyseImage(obj, rgbImgMsg, robotPose)
@@ -146,7 +151,7 @@ classdef turtlebot_follower
                 % display tag axis
                 worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
                 %for i = 1:length(pose)
-                i = 1
+                i = 1;
                     % Get image coordinates for axes.
                     imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
                 
@@ -220,6 +225,23 @@ classdef turtlebot_follower
         function odomMsg = OdomCallback(obj)
             odomMsg = receive(obj.OdomSub,3);
             pose = odomMsg.Pose.Pose;
+            x = pose.Position.X;
+            y = pose.Position.Y;
+            z = pose.Position.Z;
+            
+            % display x, y, z values
+            [x y z] 
+            
+            quat = pose.Orientation;
+            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+            
+            % display orientation
+            theta = rad2deg(angles(1))
+        end
+
+        function poseMsg = PoseCallback(obj) %standin for calling pose
+            poseMsg = receive(obj.PoseSub,3);
+            pose = poseMsg.Pose.Pose;
             x = pose.Position.X;
             y = pose.Position.Y;
             z = pose.Position.Z;
