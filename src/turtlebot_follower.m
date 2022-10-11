@@ -45,8 +45,6 @@ classdef turtlebot_follower
 
                 currentOdom = OdomCallback(obj);
                 robotPose = currentOdom.Pose.Pose;
-                currentLeaderPose = PoseCallback(obj);
-                leaderPose = currentLeaderPose.Pose.Pose;
 
                 [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, robotPose);
 
@@ -57,6 +55,11 @@ classdef turtlebot_follower
                 end
 
                 if markerPresent
+                    currentOdom = OdomCallback(obj);
+                    robotPose = currentOdom.Pose.Pose;
+                    currentLeaderPose = PoseCallback(obj);
+                    leaderPose = currentLeaderPose.Pose.Pose;
+                    
                    MoveTowardsMarker(obj, leaderPose, robotPose); % leaderPose is temporary, change back to pose when done
                 else
                     velocities = [0,0,0,0,0,0];
@@ -82,9 +85,13 @@ classdef turtlebot_follower
             % proportional controller
             kp = 0.1;
 
-            quat = currentPose.Orientation;
+            quat = goalPose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
             theta = rad2deg(angles(1));
+
+            quat = currentPose.Orientation;
+            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+            phi = rad2deg(angles(1));
 
             xDiff = goalPose.Position.X - currentPose.Position.X;
             yDiff = goalPose.Position.Y - currentPose.Position.Y;
@@ -114,8 +121,8 @@ classdef turtlebot_follower
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
             theta = rad2deg(angles(1));
             % get x,y distance away based on angle
-            translate_x = -distance*cos(theta);
-            translate_y = -distance*sin(theta);
+            translate_x = -distance*cos(angles(1));
+            translate_y = -distance*sin(angles(1));
 
             % convert from rigid3d to ros Pose
             goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
