@@ -85,31 +85,54 @@ classdef turtlebot_follower
             % proportional controller
             kp = 0.1;
 
-            quat = goalPose.Orientation;
-            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            theta = rad2deg(angles(1));
+            quatGoal = goalPose.Orientation;
+            angles = quat2eul([quatGoal.W quatGoal.X quatGoal.Y quatGoal.Z]);
+            thetaGoal = rad2deg(angles(1));
 
-            quat = currentPose.Orientation;
-            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            phi = rad2deg(angles(1));
+            quatCurrent = currentPose.Orientation;
+            angles = quatCurrent2eul([quatCurrent.W quatCurrent.X quatCurrent.Y quatCurrent.Z]);
+            thetaCurrent = rad2deg(angles(1));
 
             xDiff = goalPose.Position.X - currentPose.Position.X;
             yDiff = goalPose.Position.Y - currentPose.Position.Y;
             angularError = atan2(yDiff,xDiff);
 
-            linearError = sqrt(pow2(goalPose.Position.X - currentPose.Position.X) ...
-                + pow2(goalPose.Position.Y - currentPose.Position.Y));
-
-            pAng = kp * angularError;
-            pLin = kp * linearError;
-
-            if abs(angularError - theta) > 0.1
-                cmdVel(1,6) = 0.3*pAng;
-            elseif linearError > 0.5
-                cmdVel(1,1) = 0.5*pLin;
+            if abs(xDiff)<0.05 && abs(yDiff)<0.05
+                if abs(thetaGoal-thetaCurrent)<1
+                    % at goal and facing correct direction
+                    % do nothing
+                    cmdVel = [0 0 0 0 0 0];
+                else
+                    % at goal and not facing correct direction
+                    % spin to correct direction
+                    cmdVel = [0 0 0 0 0 0.3];
+                end
             else
-                cmdVel(1,6) = 0;
+                if abs(rad2deg(angularError)-thetaCurrent)<1
+                    % facing direction of goal but not there yet
+                    % drive towards goal
+                    cmdVel = [0.5 0 0 0 0 0];
+                else
+                    % not facing direction of goal and not at goal
+                    % turn to face goal
+                    cmdVel = [0 0 0 0 0 0.3];
+                end
             end
+
+
+%             linearError = sqrt(pow2(goalPose.Position.X - currentPose.Position.X) ...
+%                 + pow2(goalPose.Position.Y - currentPose.Position.Y));
+
+%             pAng = kp * angularError;
+%             pLin = kp * linearError;
+
+%             if abs(angularError - theta) > 0.1
+%                 cmdVel(1,6) = 0.3*pAng;
+%             elseif linearError > 0.5
+%                 cmdVel(1,1) = 0.5*pLin;
+%             else
+%                 cmdVel(1,6) = 0;
+%             end
         end
 
         function goalPose = DetermineGoalPose(obj, pose)
