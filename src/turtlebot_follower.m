@@ -107,17 +107,21 @@ classdef turtlebot_follower
 
         function goalPose = DetermineGoalPose(obj, pose)
             % pose = pose from AR Tag
-            % translate this pose to be about 1m away from leader turtlebot
-            translate_x = 3;
-            translate_y = 0;
-            translate_z = 0;
-            theta = 0;
+            % translate this pose to be about 0.5m away from leader turtlebot
+            distance = 0.5;
+            % find angle of AR tag
+            quat = pose.Orientation;
+            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+            theta = rad2deg(angles(1));
+            % get x,y distance away based on angle
+            translate_x = -distance*cos(theta);
+            translate_y = -distance*sin(theta);
 
             % convert from rigid3d to ros Pose
             goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
-            goalPose.Position.X = pose.Position.X +translate_x;
-            goalPose.Position.Y = pose.Position.Y +translate_y;
-            goalPose.Position.Z = pose.Position.Z +translate_z;
+            goalPose.Position.X = pose.Position.X+translate_x;
+            goalPose.Position.Y = pose.Position.Y+translate_y;
+            goalPose.Position.Z = pose.Position.Z;
 %             goalPose.Orientation = rotm2quat(pose(1:3,1:3));  % Add back
 %             in later when using AnalyseImage
             goalPose.Orientation = pose.Orientation;
@@ -247,13 +251,13 @@ classdef turtlebot_follower
             z = pose.Position.Z;
             
             % display x, y, z values
-            [x y z] 
+            [x y z];
             
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
             
             % display orientation
-            theta = rad2deg(angles(1))
+            theta = rad2deg(angles(1));
         end
 
         function LidarCallback(obj)
