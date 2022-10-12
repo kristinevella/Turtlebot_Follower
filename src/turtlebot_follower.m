@@ -76,13 +76,13 @@ classdef turtlebot_follower
         end
 
         function MoveTowardsMarker(obj, pose, robotPose)
-            
-            goalPose = DetermineGoalPose(obj, pose);
-            cmdVel = DetermineCmdVelocity(obj, goalPose, robotPose); 
+            distance = 0.7;
+            goalPose = DetermineGoalPose(obj, distance, pose);
+            cmdVel = DetermineCmdVelocity(obj, distance, pose, goalPose, robotPose); 
             PublishCmdVelocity(obj, cmdVel);
         end
 
-        function cmdVel = DetermineCmdVelocity(obj, goalPose, currentPose)
+        function cmdVel = DetermineCmdVelocity(obj, distance, pose, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
             % proportional controller
             kp = 0.1;
@@ -95,11 +95,15 @@ classdef turtlebot_follower
             angles = quat2eul([quatCurrent.W quatCurrent.X quatCurrent.Y quatCurrent.Z]);
             thetaCurrent = rad2deg(angles(1));
 
-            xDiff = goalPose.Position.X - currentPose.Position.X
-            yDiff = goalPose.Position.Y - currentPose.Position.Y
+            xDiff = goalPose.Position.X - currentPose.Position.X;
+            yDiff = goalPose.Position.Y - currentPose.Position.Y;
             angularError = rad2deg(atan2(yDiff,xDiff));
             direction1 = (angularError-thetaCurrent)/(abs(angularError-thetaCurrent));
-            direction2 = xDiff/abs(xDiff);
+            if (pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2 >= distance
+                direction2 = 1;
+            else
+                direction2 = -1;
+            end
             direction3 = (thetaGoal-thetaCurrent)/(abs(thetaGoal-thetaCurrent));
 
             if abs(xDiff)<0.1 && abs(yDiff)<0.1
@@ -144,10 +148,10 @@ classdef turtlebot_follower
 %             end
         end
 
-        function goalPose = DetermineGoalPose(obj, pose)
+        function goalPose = DetermineGoalPose(obj, pose, distance)
             % pose = pose from AR Tag
             % translate this pose to be about 0.5m away from leader turtlebot
-            distance = 0.7;
+            
             % find angle of AR tag
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
