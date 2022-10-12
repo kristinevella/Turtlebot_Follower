@@ -102,25 +102,29 @@ classdef turtlebot_follower
             direction2 = xDiff/abs(xDiff);
             direction3 = (thetaGoal-thetaCurrent)/(abs(thetaGoal-thetaCurrent));
 
-            if abs(xDiff)<0.05 && abs(yDiff)<0.05
+            if abs(xDiff)<0.1 && abs(yDiff)<0.1
                 if abs(thetaGoal-thetaCurrent)<1
                     % at goal and facing correct direction
                     % do nothing
                     cmdVel = [0 0 0 0 0 0];
+                    disp("at goal")
                 else
                     % at goal and not facing correct direction
                     % spin to correct direction
-                    cmdVel = [0 0 0 0 0 direction3*0.3];
+                    cmdVel = [0 0 0 0 0 direction3*0.1];
+                    disp("final spin")
                 end
             else
                 if abs(angularError-thetaCurrent)<1
                     % facing direction of goal but not there yet
                     % drive towards goal
-                    cmdVel = [direction2*0.5 0 0 0 0 0];
+                    cmdVel = [direction2*0.1 0 0 0 0 0];
+                    disp("drive to goal")
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
-                    cmdVel = [0 0 0 0 0 direction1*0.3];
+                    cmdVel = [0 0 0 0 0 direction1*0.1];
+                    disp("face goal")
                 end
             end
 
@@ -143,7 +147,7 @@ classdef turtlebot_follower
         function goalPose = DetermineGoalPose(obj, pose)
             % pose = pose from AR Tag
             % translate this pose to be about 0.5m away from leader turtlebot
-            distance = 0.5;
+            distance = 0.7;
             % find angle of AR tag
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
