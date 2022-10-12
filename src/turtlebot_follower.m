@@ -220,7 +220,7 @@ classdef turtlebot_follower
     
                 % convert image point to 3d points
                 depthImg = rosReadImage(depthMsg);
-                depth = depthImg(centerPoint(1),centerPoint(2)); % get from sensor
+                depth = depthImg(centerPoint(2),centerPoint(1)); % get from sensor
                 translation = [depth ...
                     depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1))/obj.Intrinsics.FocalLength(1) ...
                     depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2))/obj.Intrinsics.FocalLength(2)];
