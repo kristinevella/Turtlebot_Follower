@@ -115,7 +115,7 @@ classdef turtlebot_follower
                     disp("final spin")
                 end
             else
-                if abs(angularError-thetaCurrent)<1
+                if abs(angularError-thetaCurrent)<2
                     % facing direction of goal but not there yet
                     % drive towards goal
                     cmdVel = [direction2*0.1 0 0 0 0 0];
@@ -198,12 +198,12 @@ classdef turtlebot_follower
                     % Get image coordinates for axes.
                     imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
                 
-                    % Draw colored axes.
-                    I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
-                        imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
-                        Color=["red","green","blue"],LineWidth=7);
-                
-                    I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=12);
+%                     % Draw colored axes.
+%                     I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
+%                         imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+%                         Color=["red","green","blue"],LineWidth=7);
+%                 
+%                     I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=12);
                 %end
     
                 % find central tag image point
@@ -212,15 +212,27 @@ classdef turtlebot_follower
                 vMin = min(loc(:,2));
                 vMax = max(loc(:,2));
     
-                centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))];
-                I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
+                centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))]
+%                 I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
     
-                figure(1);
-                imshow(I);
+                
     
                 % convert image point to 3d points
                 depthImg = rosReadImage(depthMsg);
-                depth = depthImg(centerPoint(1),centerPoint(2)); % get from sensor
+                depth = depthImg(centerPoint(2),centerPoint(1)); % get from sensor
+
+                % Draw colored axes.
+                    depthImg = insertShape(depthImg,Line=[imagePoints(1,:) imagePoints(2,:); ...
+                        imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+                        Color=["red","green","blue"],LineWidth=7);
+                
+                    depthImg = insertText(depthImg,loc(1,:,i),id(i),BoxOpacity=1,FontSize=12);
+                    depthImg = insertMarker(depthImg,centerPoint,"circle","Size",10,"Color","yellow");
+
+                figure(1);
+                imshow(depthImg);
+
+
                 translation = [depth ...
                     depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1))/obj.Intrinsics.FocalLength(1) ...
                     depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2))/obj.Intrinsics.FocalLength(2)];
