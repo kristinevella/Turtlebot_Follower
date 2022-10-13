@@ -105,6 +105,15 @@ classdef turtlebot_follower
                 direction2 = -1;
             end
             direction3 = (thetaGoal-thetaCurrent)/(abs(thetaGoal-thetaCurrent));
+            
+            % if goal is behind it dont spin all the way around
+            if (angularError/thetaCurrent)/(abs(angularError/thetaCurrent))<0 
+                if angularError>0
+                    angularError = angularError-180;
+                else
+                    angularError = angularError+180;
+                end
+            end
 
             if abs(xDiff)<0.1 && abs(yDiff)<0.1
                 if abs(thetaGoal-thetaCurrent)<1
