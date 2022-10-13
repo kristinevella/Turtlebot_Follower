@@ -25,6 +25,7 @@ ROBOTIS-GIT Turtlebot3 - https://github.com/ROBOTIS-GIT/turtlebot3
 3. For simulation: Run launch file `roslaunch turtlebot_follower main.launch`
 4. Open and run turtlebot_follower.m in MATLAB `tf = turtlebot_follower`
 5. Call FollowTheLeader function to start `tf.FollowTheLeader`
+6. Control the leading robot using the keyboard with `rosrun teleop_twist_keyboard teleop_twist_keyboard.py /cmd_vel:=/robot2/cmd_vel`
 
 ## Collaborators
 - Kristine Vella - https://github.com/kristinevella
