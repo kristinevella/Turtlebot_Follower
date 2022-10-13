@@ -247,7 +247,7 @@ classdef turtlebot_follower
                     depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1))/obj.Intrinsics.FocalLength(1) ...
                     depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2))/obj.Intrinsics.FocalLength(2)];
 
-                poseM = eul2rotm([-1.57 0 -1.57]); % from camera - see urdf file
+                poseM = eul2rotm([0 0 0]); %eul2rotm([-1.57 0 -1.57]); % from camera - see urdf file
                 poseM(1:3,4) = translation';
                 poseM(4,4) = 1;
     
@@ -256,7 +256,7 @@ classdef turtlebot_follower
                 worldPoseTr(1:3,4) = [robotPose.Position.X;robotPose.Position.Y;robotPose.Position.Z];
                 worldPoseTr(4,4) = 1;
     
-                worldPose = inv(worldPoseTr) * poseM;
+                worldPose = worldPoseTr * poseM;
 
                 markerPresent = true;
                 disp("Marker detected at");
