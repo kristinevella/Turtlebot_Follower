@@ -39,6 +39,7 @@ classdef turtlebot_follower
             timer = 5;
             readAprilTagTime = timer;
             markerPresent = 0;
+            i = 0;
             %reset(r);
             while followLeader
                 % get values from robot
@@ -63,7 +64,7 @@ classdef turtlebot_follower
 %                     currentLeaderPose = PoseCallback(obj);
 %                     leaderPose = currentLeaderPose.Pose.Pose;
 
-                    refPose = SetRefPose(obj, pose);
+                    refPose = SetRefPose(obj, pose, i);
                     
                     MoveTowardsMarker(obj, refPose, robotPose); % leaderPose is temporary, change back to pose when done
                 else
@@ -80,58 +81,58 @@ classdef turtlebot_follower
             end
         end
 
-        function refPose = SetRefPose(obj, pose)
+        function refPose = SetRefPose(obj, pose, i)
             % map the pose taken from image analysis whenever it moves 0.3m
             % from its last position OR whenever it turns
             changeInDistance = 0.3;
-            % save the first pose for comparison
-            switch i
-                case 0
-                    firstPose = pose;
-                    i = 1;
-                case 1
-                    if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= changeInDistance
-                        refPose = pose;
-                        i = 4;
-                    end
-
-                    % difference in angle between first and current pose
-                    % more than 5 degrees
-                    quatFirst = firstPose.Orientation;
-                    anglesFirst = quat2eul([quatFirst.W quatFirst.X quatFirst.Y quatFirst.Z]);
-                    thetaFirst = rad2deg(anglesFirst(1));
-
-                    quatPose = pose.Orientation;
-                    anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
-                    thetaPose = rad2deg(anglesPose(1));
-
-                    if abs(thetaFirst-thetaPose)>5
-                        secondPose = pose;
-                        i = 2;
-                    end
-
-                case 2
-                    % difference in angle between second and third pose
-                    % less than 2 degrees
-                    quatSecond = secondPose.Orientation;
-                    anglesSecond = quat2eul([quatSecond.W quatSecond.X quatSecond.Y quatSecond.Z]);
-                    thetaSecond = rad2deg(anglesSecond(1));
-
-                    thirdPose = pose;
-                    quatThird = thirdPose.Orientation;
-                    anglesThird = quat2eul([quatThird.W quatThird.X quatThird.Y quatThird.Z]);
-                    thetaThird = rad2deg(anglesThird(1));
-
-                    if abs(thetaThird-thetaSecond)<2
-                        refPose = pose;
-                        i = 4;
-                    else
-                        secondPose = thirdPose;
-                    end
-                otherwise
-                    % no reference pose set
             
+            % save the first pose for comparison
+            if i==0
+                firstPose = pose;
+                refPose = pose;
+                i = 1;
+            end
 
+            if i==1
+                if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= changeInDistance
+                    refPose = pose;
+                    i = 4;
+                end
+
+                % difference in angle between first and current pose
+                % more than 5 degrees
+                quatFirst = firstPose.Orientation;
+                anglesFirst = quat2eul([quatFirst.W quatFirst.X quatFirst.Y quatFirst.Z]);
+                thetaFirst = rad2deg(anglesFirst(1));
+
+                quatPose = pose.Orientation;
+                anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
+                thetaPose = rad2deg(anglesPose(1));
+
+                if abs(thetaFirst-thetaPose)>5
+                    secondPose = pose;
+                    i = 2;
+                end
+            end
+
+            if i==2
+                % difference in angle between second and third pose
+                % less than 2 degrees
+                quatSecond = secondPose.Orientation;
+                anglesSecond = quat2eul([quatSecond.W quatSecond.X quatSecond.Y quatSecond.Z]);
+                thetaSecond = rad2deg(anglesSecond(1));
+
+                thirdPose = pose;
+                quatThird = thirdPose.Orientation;
+                anglesThird = quat2eul([quatThird.W quatThird.X quatThird.Y quatThird.Z]);
+                thetaThird = rad2deg(anglesThird(1));
+
+                if abs(thetaThird-thetaSecond)<2
+                    refPose = pose;
+                    i = 4;
+                else
+                    secondPose = thirdPose;
+                end
             end
         end
 
@@ -315,11 +316,21 @@ classdef turtlebot_follower
                 worldPoseTr(1:3,4) = [robotPose.Position.X;robotPose.Position.Y;robotPose.Position.Z];
                 worldPoseTr(4,4) = 1;
     
-                worldPose = worldPoseTr * poseM;
+                worldPoseTM = worldPoseTr * poseM;
 
                 markerPresent = true;
                 disp("Marker detected at");
-                disp(worldPose);
+                disp(worldPoseTM);
+
+                worldPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
+                worldPose.Position.X = worldPoseTM(1,4);
+                worldPose.Position.Y = worldPoseTM(2,4);
+                worldPose.Position.Z = worldPoseTM(3,4);
+                quatWorldPose = rotm2quat(worldPoseTM(1:3,1:3));
+                worldPose.Orientation.W = quatWorldPose(1);
+                worldPose.Orientation.X = quatWorldPose(2);
+                worldPose.Orientation.Y = quatWorldPose(3);
+                worldPose.Orientation.Z = quatWorldPose(4);
             end
         end
 
