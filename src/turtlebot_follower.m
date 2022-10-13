@@ -56,22 +56,78 @@ classdef turtlebot_follower
                     % do nothing
                 end
 
-                if markerPresent
-                    currentOdom = OdomCallback(obj);
-                    robotPose = currentOdom.Pose.Pose;
-                    currentLeaderPose = PoseCallback(obj);
-                    leaderPose = currentLeaderPose.Pose.Pose;
-                    
-                    MoveTowardsMarker(obj, leaderPose, robotPose); % leaderPose is temporary, change back to pose when done
-                else
-                    velocities = [0,0,0,0,0,0];
-                    PublishCmdVelocity(obj, velocities); % stand still if marker not present
-                end
+                
+                currentOdom = OdomCallback(obj);
+                robotPose = currentOdom.Pose.Pose;
+                currentLeaderPose = PoseCallback(obj);
+                leaderPose = currentLeaderPose.Pose.Pose;
+
+                refPose = SetRefPose(obj, pose);
+                
+                MoveTowardsMarker(obj, refPose, robotPose);
+               
 
                 % stop after 5 minutes
                 if toc > 5*60
                    followLeader = false;
                 end
+            end
+            velocities = [0,0,0,0,0,0];
+            PublishCmdVelocity(obj, velocities);
+        end
+
+        function refPose = SetRefPose(obj, pose)
+            % map the pose taken from image analysis whenever it moves 0.3m
+            % from its last position OR whenever it turns
+            changeInDistance = 0.3;
+            % save the first pose for comparison
+            switch i
+                case 0
+                    firstPose = pose;
+                    i = 1;
+                case 1
+                    if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= changeInDistance
+                        refPose = pose;
+                        i = 4;
+                    end
+
+                    % difference in angle between first and current pose
+                    % more than 5 degrees
+                    quatFirst = firstPose.Orientation;
+                    anglesFirst = quat2eul([quatFirst.W quatFirst.X quatFirst.Y quatFirst.Z]);
+                    thetaFirst = rad2deg(anglesFirst(1));
+
+                    quatPose = pose.Orientation;
+                    anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
+                    thetaPose = rad2deg(anglesPose(1));
+
+                    if abs(thetaFirst-thetaPose)>5
+                        secondPose = pose;
+                        i = 2;
+                    end
+
+                case 2
+                    % difference in angle between second and third pose
+                    % less than 2 degrees
+                    quatSecond = secondPose.Orientation;
+                    anglesSecond = quat2eul([quatSecond.W quatSecond.X quatSecond.Y quatSecond.Z]);
+                    thetaSecond = rad2deg(anglesSecond(1));
+
+                    thirdPose = pose;
+                    quatThird = thirdPose.Orientation;
+                    anglesThird = quat2eul([quatThird.W quatThird.X quatThird.Y quatThird.Z]);
+                    thetaThird = rad2deg(anglesThird(1));
+
+                    if abs(thetaThird-thetaSecond)<2
+                        refPose = pose;
+                        i = 4;
+                    else
+                        secondPose = thirdPose;
+                    end
+                otherwise
+                    % no reference pose set
+            
+
             end
         end
 
