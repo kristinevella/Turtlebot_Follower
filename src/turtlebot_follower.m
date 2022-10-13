@@ -11,7 +11,7 @@ classdef turtlebot_follower
         MarkerImg;
         Intrinsics;
         MarkerSize = 0.09;
-        Distance = 0.7;
+        Distance = 0.9;
     end
     methods
         function obj = turtlebot_follower()
@@ -84,7 +84,7 @@ classdef turtlebot_follower
         function refPose = SetRefPose(obj, pose, i)
             % map the pose taken from image analysis whenever it moves 0.3m
             % from its last position OR whenever it turns
-            changeInDistance = 0.3;
+            changeInDistance = 0.05;
             
             % save the first pose for comparison
             if i==0
@@ -145,7 +145,7 @@ classdef turtlebot_follower
         function cmdVel = DetermineCmdVelocity(obj, pose, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
             % proportional controller
-            kp = 0.1;
+%             kp = 0.1;
 
             quatGoal = goalPose.Orientation;
             angles = quat2eul([quatGoal.W quatGoal.X quatGoal.Y quatGoal.Z]);
