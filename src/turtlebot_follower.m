@@ -60,10 +60,12 @@ classdef turtlebot_follower
                 if markerPresent
                     currentOdom = OdomCallback(obj);
                     robotPose = currentOdom.Pose.Pose;
-                    currentLeaderPose = PoseCallback(obj);
-                    leaderPose = currentLeaderPose.Pose.Pose;
+%                     currentLeaderPose = PoseCallback(obj);
+%                     leaderPose = currentLeaderPose.Pose.Pose;
+
+                    refPose = SetRefPose(obj, pose);
                     
-                    MoveTowardsMarker(obj, leaderPose, robotPose); % leaderPose is temporary, change back to pose when done
+                    MoveTowardsMarker(obj, refPose, robotPose); % leaderPose is temporary, change back to pose when done
                 else
                     velocities = [0,0,0,0,0,0];
                     PublishCmdVelocity(obj, velocities); % stand still if marker not present
@@ -72,6 +74,8 @@ classdef turtlebot_follower
                 % stop after 5 minutes
                 if toc > 5*60
                    followLeader = false;
+                   velocities = [0,0,0,0,0,0];
+                   PublishCmdVelocity(obj, velocities);
                 end
             end
         end
