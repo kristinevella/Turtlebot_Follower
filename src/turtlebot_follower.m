@@ -11,6 +11,7 @@ classdef turtlebot_follower
         MarkerImg;
         Intrinsics;
         MarkerSize = 0.09;
+        Distance = 0.7;
     end
     methods
         function obj = turtlebot_follower()
@@ -76,13 +77,12 @@ classdef turtlebot_follower
         end
 
         function MoveTowardsMarker(obj, pose, robotPose)
-            distance = 0.7;
-            goalPose = DetermineGoalPose(obj, distance, pose);
-            cmdVel = DetermineCmdVelocity(obj, distance, pose, goalPose, robotPose); 
+            goalPose = DetermineGoalPose(obj, pose);
+            cmdVel = DetermineCmdVelocity(obj, pose, goalPose, robotPose); 
             PublishCmdVelocity(obj, cmdVel);
         end
 
-        function cmdVel = DetermineCmdVelocity(obj, distance, pose, goalPose, currentPose)
+        function cmdVel = DetermineCmdVelocity(obj, pose, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
             % proportional controller
             kp = 0.1;
@@ -99,7 +99,7 @@ classdef turtlebot_follower
             yDiff = goalPose.Position.Y - currentPose.Position.Y;
             angularError = rad2deg(atan2(yDiff,xDiff));
             direction1 = (angularError-thetaCurrent)/(abs(angularError-thetaCurrent));
-            if (pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2 >= distance
+            if (pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2 >= obj.Distance
                 direction2 = 1;
             else
                 direction2 = -1;
@@ -148,17 +148,17 @@ classdef turtlebot_follower
 %             end
         end
 
-        function goalPose = DetermineGoalPose(obj, pose, distance)
+        function goalPose = DetermineGoalPose(obj, pose)
             % pose = pose from AR Tag
             % translate this pose to be about 0.5m away from leader turtlebot
             
             % find angle of AR tag
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            theta = rad2deg(angles(1));
+            theta = angles(1);
             % get x,y distance away based on angle
-            translate_x = -distance*cos(angles(1));
-            translate_y = -distance*sin(angles(1));
+            translate_x = -obj.Distance*cos(theta);
+            translate_y = -obj.Distance*sin(theta);
 
             % convert from rigid3d to ros Pose
             goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
@@ -182,7 +182,7 @@ classdef turtlebot_follower
 
             % april tag     
             I = undistortImage(rgbImg,obj.Intrinsics,OutputView="same");
-            [id,loc,pose] = readAprilTag(refinedImage,"tag36h11", obj.Intrinsics,obj.MarkerSize)
+            [id,loc,pose] = readAprilTag(refinedImage,"tag36h11", obj.Intrinsics,obj.MarkerSize);
             
             if isempty(id)
                 markerPresent = false;
@@ -196,19 +196,17 @@ classdef turtlebot_follower
                 pose = rigid3d(updatedR, pose.Translation);
 
                 % display tag axis
-                worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2]
-                %for i = 1:length(pose)
-                i = 1;
-                    % Get image coordinates for axes.
-                    imagePoints = worldToImage(obj.Intrinsics,pose(i),worldPoints);
-                
-%                     % Draw colored axes.
-%                     I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
-%                         imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
-%                         Color=["red","green","blue"],LineWidth=7);
-%                 
-%                     I = insertText(I,loc(1,:,i),id(i),BoxOpacity=1,FontSize=12);
-                %end
+                worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2];
+
+                % Get image coordinates for axes.
+                imagePoints = worldToImage(obj.Intrinsics,pose(1),worldPoints);
+            
+                % Draw colored axes.
+                I = insertShape(I,Line=[imagePoints(1,:) imagePoints(2,:); ...
+                    imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+                    Color=["red","green","blue"],LineWidth=7);
+            
+                I = insertText(I,loc(1,:,1),id(1),BoxOpacity=1,FontSize=12);
     
                 % find central tag image point
                 uMin = min(loc(:,1));
@@ -216,32 +214,31 @@ classdef turtlebot_follower
                 vMin = min(loc(:,2));
                 vMax = max(loc(:,2));
     
-                centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))]
-%                 I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
-    
-                
-    
+                centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))];                 
+                I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
+                %figure(1);
+                %imshow(I);
+       
                 % convert image point to 3d points
                 depthImg = rosReadImage(depthMsg);
                 depth = depthImg(centerPoint(2),centerPoint(1)); % get from sensor
 
                 % Draw colored axes.
-                    depthImg = insertShape(depthImg,Line=[imagePoints(1,:) imagePoints(2,:); ...
-                        imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
-                        Color=["red","green","blue"],LineWidth=7);
-                
-                    depthImg = insertText(depthImg,loc(1,:,i),id(i),BoxOpacity=1,FontSize=12);
-                    depthImg = insertMarker(depthImg,centerPoint,"circle","Size",10,"Color","yellow");
+                depthImg = insertShape(depthImg,Line=[imagePoints(1,:) imagePoints(2,:); ...
+                    imagePoints(1,:) imagePoints(3,:); imagePoints(1,:) imagePoints(4,:)], ...
+                    Color=["red","green","blue"],LineWidth=7);
+            
+                depthImg = insertText(depthImg,loc(1,:,1),id(1),BoxOpacity=1,FontSize=12);
+                depthImg = insertMarker(depthImg,centerPoint,"circle","Size",10,"Color","yellow");
 
-                figure(1);
-                imshow(depthImg);
-
+                %figure(2);
+                %imshow(depthImg);
 
                 translation = [depth ...
                     depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1))/obj.Intrinsics.FocalLength(1) ...
                     depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2))/obj.Intrinsics.FocalLength(2)];
 
-                poseM = eul2rotm([0 0 0]);
+                poseM = eul2rotm([-1.57 0 -1.57]); % from camera - see urdf file
                 poseM(1:3,4) = translation';
                 poseM(4,4) = 1;
     
