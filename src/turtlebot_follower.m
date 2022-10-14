@@ -44,7 +44,7 @@ classdef turtlebot_follower
             while followLeader
                 % get values from robot
                 % every ten seconds get new image
-                if toc > readAprilTagTime
+%                 if toc > readAprilTagTime
                 rgbImgMsg = CameraRgbCallback(obj);
                 depthMsg = CameraDepthCallback(obj);
                 currentOdom = OdomCallback(obj);
@@ -54,9 +54,9 @@ classdef turtlebot_follower
 
                 readAprilTagTime = toc+timer;
                 disp("Image Read")
-                else
-                    % do nothing
-                end
+%                 else
+%                     % do nothing
+%                 end
 
                 if markerPresent
                     currentOdom = OdomCallback(obj);
@@ -84,19 +84,21 @@ classdef turtlebot_follower
         function refPose = SetRefPose(obj, pose, i)
             % map the pose taken from image analysis whenever it moves 0.3m
             % from its last position OR whenever it turns
-            changeInDistance = 0.05;
+            changeInDistance = 0.01;
             
             % save the first pose for comparison
             if i==0
                 firstPose = pose;
                 refPose = pose;
                 i = 1;
+                disp("first pose")
             end
 
             if i==1
                 if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= changeInDistance
                     refPose = pose;
                     i = 4;
+                    disp("translation")
                 end
 
                 % difference in angle between first and current pose
@@ -112,6 +114,7 @@ classdef turtlebot_follower
                 if abs(thetaFirst-thetaPose)>5
                     secondPose = pose;
                     i = 2;
+                    disp("second pose")
                 end
             end
 
@@ -130,8 +133,10 @@ classdef turtlebot_follower
                 if abs(thetaThird-thetaSecond)<2
                     refPose = pose;
                     i = 4;
+                    disp("rotation")
                 else
                     secondPose = thirdPose;
+                    disp("third pose")
                 end
             end
         end
