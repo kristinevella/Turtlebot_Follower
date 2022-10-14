@@ -11,7 +11,7 @@ classdef turtlebot_follower
         MarkerImg;
         Intrinsics;
         MarkerSize = 0.09;
-        Distance = 0.9;
+        Distance = 0.5;
     end
     methods
         function obj = turtlebot_follower()
@@ -53,7 +53,7 @@ classdef turtlebot_follower
                 [markerPresent, pose] = AnalyseImage(obj, rgbImgMsg, depthMsg, robotPose);
 
                 readAprilTagTime = toc+timer;
-                disp("Image Read")
+                disp("Image Read");
 %                 else
 %                     % do nothing
 %                 end
@@ -149,28 +149,35 @@ classdef turtlebot_follower
 
         function cmdVel = DetermineCmdVelocity(obj, pose, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
-            % proportional controller
-%             kp = 0.1;
+
+            % display goal transform
+            goalPoseTr = quat2rotm([goalPose.Orientation.W goalPose.Orientation.X goalPose.Orientation.Y goalPose.Orientation.Z]);
+            goalPoseTr(4,:) = [0 0 0];
+            goalPoseTr(:,4) = [goalPose.Position.X; goalPose.Position.Y; goalPose.Position.Z; 1];
+            disp("Goal:");
+            disp(goalPoseTr);
 
             quatGoal = goalPose.Orientation;
             angles = quat2eul([quatGoal.W quatGoal.X quatGoal.Y quatGoal.Z]);
-            thetaGoal = rad2deg(angles(1));
+            thetaGoal = rad2deg(angles(1))
 
             quatCurrent = currentPose.Orientation;
             angles = quat2eul([quatCurrent.W quatCurrent.X quatCurrent.Y quatCurrent.Z]);
-            thetaCurrent = rad2deg(angles(1));
+            thetaCurrent = rad2deg(angles(1))
 
-            xDiff = goalPose.Position.X - currentPose.Position.X;
-            yDiff = goalPose.Position.Y - currentPose.Position.Y;
+            xDiff = abs(goalPose.Position.X - currentPose.Position.X)
+            yDiff = abs(goalPose.Position.Y - currentPose.Position.Y)
             angularError = rad2deg(atan2(yDiff,xDiff));
             direction1 = (angularError-thetaCurrent)/(abs(angularError-thetaCurrent));
-            if (pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2 >= obj.Distance
+            currentDistance = (pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2 
+            if currentDistance >= obj.Distance
                 direction2 = 1;
             else
                 direction2 = -1;
             end
             direction3 = (thetaGoal-thetaCurrent)/(abs(thetaGoal-thetaCurrent));
             
+            % do we need this angular error value ??
             % if goal is behind it dont spin all the way around
             if (angularError/thetaCurrent)/(abs(angularError/thetaCurrent))<0 
                 if angularError>0
@@ -181,45 +188,30 @@ classdef turtlebot_follower
             end
 
             if abs(xDiff)<0.1 && abs(yDiff)<0.1
-                if abs(thetaGoal-thetaCurrent)<1
+                if abs(thetaGoal-thetaCurrent)<3
                     % at goal and facing correct direction
                     % do nothing
                     cmdVel = [0 0 0 0 0 0];
-                    disp("at goal")
+                    disp("!!! At goal !!!")
                 else
                     % at goal and not facing correct direction
                     % spin to correct direction
                     cmdVel = [0 0 0 0 0 direction3*0.1];
-                    disp("final spin")
+                    disp("Final spin")
                 end
             else
-                if abs(angularError-thetaCurrent)<2
+                if abs(thetaGoal-thetaCurrent)<3
                     % facing direction of goal but not there yet
                     % drive towards goal
                     cmdVel = [direction2*0.1 0 0 0 0 0];
-                    disp("drive to goal")
+                    disp("Drive to goal")
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
                     cmdVel = [0 0 0 0 0 direction1*0.1];
-                    disp("face goal")
+                    disp("Face goal")
                 end
             end
-
-
-%             linearError = sqrt(pow2(goalPose.Position.X - currentPose.Position.X) ...
-%                 + pow2(goalPose.Position.Y - currentPose.Position.Y));
-
-%             pAng = kp * angularError;
-%             pLin = kp * linearError;
-
-%             if abs(angularError - theta) > 0.1
-%                 cmdVel(1,6) = 0.3*pAng;
-%             elseif linearError > 0.5
-%                 cmdVel(1,1) = 0.5*pLin;
-%             else
-%                 cmdVel(1,6) = 0;
-%             end
         end
 
         function goalPose = DetermineGoalPose(obj, pose)
@@ -369,36 +361,36 @@ classdef turtlebot_follower
 
         function odomMsg = OdomCallback(obj)
             odomMsg = receive(obj.OdomSub,3);
-            pose = odomMsg.Pose.Pose;
-            x = pose.Position.X;
-            y = pose.Position.Y;
-            z = pose.Position.Z;
-            
-            % display x, y, z values
-            [x y z] 
-            
-            quat = pose.Orientation;
-            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            
-            % display orientation
-            theta = rad2deg(angles(1));
+%             pose = odomMsg.Pose.Pose;
+%             x = pose.Position.X;
+%             y = pose.Position.Y;
+%             z = pose.Position.Z;
+%             
+%             % display x, y, z values
+%             [x y z]; 
+%             
+%             quat = pose.Orientation;
+%             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+%             
+%             % display orientation
+%             theta = rad2deg(angles(1));
         end
 
         function poseMsg = PoseCallback(obj) %standin for calling pose
             poseMsg = receive(obj.PoseSub,3);
-            pose = poseMsg.Pose.Pose;
-            x = pose.Position.X;
-            y = pose.Position.Y;
-            z = pose.Position.Z;
-            
-            % display x, y, z values
-            [x y z];
-            
-            quat = pose.Orientation;
-            angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            
-            % display orientation
-            theta = rad2deg(angles(1));
+%             pose = poseMsg.Pose.Pose;
+%             x = pose.Position.X;
+%             y = pose.Position.Y;
+%             z = pose.Position.Z;
+%             
+%             % display x, y, z values
+%             [x y z];
+%             
+%             quat = pose.Orientation;
+%             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+%             
+%             % display orientation
+%             theta = rad2deg(angles(1));
         end
 
         function scanMsg = LidarCallback(obj)
