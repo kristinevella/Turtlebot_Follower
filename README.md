@@ -14,11 +14,12 @@ Turtlebot Simulator with a certain distance.
 - MATLAB 2022a
 #### For use with Real Robots (not needed for simulation)
 - 2x Turtlebot3 Waffle Pi
+- 1x Intel® RealSense™ R200 camera
 - Printed April Tag from tag36h11 family (9x9cm) mounted to leading robot
 
 ### Dependencies
-ROBOTIS-GIT Turtlebot3 - https://github.com/ROBOTIS-GIT/turtlebot3
-Intel RealSense - https://github.com/intel-ros/realsense.git
+- ROBOTIS-GIT Turtlebot3 - https://github.com/ROBOTIS-GIT/turtlebot3
+- Intel RealSense - https://github.com/intel-ros/realsense.git
 
 ## Running the Project
 1. Clone this repository to the /src directory of your workspace
