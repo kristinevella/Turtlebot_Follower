@@ -11,7 +11,7 @@ classdef turtlebot_follower
         MarkerImg;
         Intrinsics;
         MarkerSize = 0.09;
-        Distance = 0.5;
+        Distance = 0.2;
     end
     methods
         function obj = turtlebot_follower()
@@ -41,6 +41,7 @@ classdef turtlebot_follower
             markerPresent = 0;
             i = 0;
             %reset(r);
+            
             while followLeader
                 % get values from robot
                 % every ten seconds get new image
@@ -58,15 +59,19 @@ classdef turtlebot_follower
 %                     % do nothing
 %                 end
 
-                if markerPresent
+                if markerPresent && ~isnan(pose.Position.X)
+
+                    
                     currentOdom = OdomCallback(obj);
                     robotPose = currentOdom.Pose.Pose;
 %                     currentLeaderPose = PoseCallback(obj);
 %                     leaderPose = currentLeaderPose.Pose.Pose;
 
+                    % Move towards the marker
                     refPose = SetRefPose(obj, pose, i);
-                    
-                    MoveTowardsMarker(obj, refPose, robotPose); % leaderPose is temporary, change back to pose when done
+                    goalPose = DetermineGoalPose(obj, refPose);
+                    cmdVel = DetermineCmdVelocity(obj, refPose, goalPose, robotPose); 
+                    PublishCmdVelocity(obj, cmdVel);
                 else
                     velocities = [0,0,0,0,0,0];
                     PublishCmdVelocity(obj, velocities); % stand still if marker not present
@@ -141,21 +146,21 @@ classdef turtlebot_follower
             end
         end
 
-        function MoveTowardsMarker(obj, pose, robotPose)
-            goalPose = DetermineGoalPose(obj, pose);
-            cmdVel = DetermineCmdVelocity(obj, pose, goalPose, robotPose); 
-            PublishCmdVelocity(obj, cmdVel);
-        end
-
         function cmdVel = DetermineCmdVelocity(obj, pose, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
 
-            % display goal transform
+            % display goal transform & pose
             goalPoseTr = quat2rotm([goalPose.Orientation.W goalPose.Orientation.X goalPose.Orientation.Y goalPose.Orientation.Z]);
             goalPoseTr(4,:) = [0 0 0];
             goalPoseTr(:,4) = [goalPose.Position.X; goalPose.Position.Y; goalPose.Position.Z; 1];
             disp("Goal:");
             disp(goalPoseTr);
+
+            poseTr = quat2rotm([pose.Orientation.W pose.Orientation.X pose.Orientation.Y pose.Orientation.Z]);
+            poseTr(4,:) = [0 0 0];
+            poseTr(:,4) = [pose.Position.X; pose.Position.Y; pose.Position.Z; 1];
+            disp("Pose:");
+            disp(poseTr);
 
             quatGoal = goalPose.Orientation;
             angles = quat2eul([quatGoal.W quatGoal.X quatGoal.Y quatGoal.Z]);
@@ -187,8 +192,11 @@ classdef turtlebot_follower
                 end
             end
 
-            if abs(xDiff)<0.1 && abs(yDiff)<0.1
-                if abs(thetaGoal-thetaCurrent)<3
+            if isnan(currentDistance)
+                cmdVel = [0 0 0 0 0 0];
+                disp("Invalid data - Stop")              
+            elseif abs(xDiff)<0.05 && abs(yDiff)<0.05
+                if abs(thetaGoal-thetaCurrent)<2
                     % at goal and facing correct direction
                     % do nothing
                     cmdVel = [0 0 0 0 0 0];
@@ -200,7 +208,7 @@ classdef turtlebot_follower
                     disp("Final spin")
                 end
             else
-                if abs(thetaGoal-thetaCurrent)<3
+                if abs(thetaGoal-thetaCurrent)<1
                     % facing direction of goal but not there yet
                     % drive towards goal
                     cmdVel = [direction2*0.1 0 0 0 0 0];
