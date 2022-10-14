@@ -18,6 +18,7 @@ Turtlebot Simulator with a certain distance.
 
 ### Dependencies
 ROBOTIS-GIT Turtlebot3 - https://github.com/ROBOTIS-GIT/turtlebot3
+Intel RealSense - https://github.com/intel-ros/realsense.git
 
 ## Running the Project
 1. Clone this repository to the /src directory of your workspace
