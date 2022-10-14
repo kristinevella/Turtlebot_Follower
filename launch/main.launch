@@ -3,7 +3,7 @@
 
   <!-- start world -->
   <node name="gazebo" pkg="gazebo_ros" type="gazebo" 
-   args="$(find turtlebot_follower)/worlds/turtlebot3_house.world" respawn="false" output="screen" />
+   args="$(find turtlebot_follower)/worlds/empty_room.world" respawn="false" output="screen" />
 
   <!-- start gui -->
   <!-- <node name="gazebo_gui" pkg="gazebo" type="gui" respawn="false" output="screen"/> -->
