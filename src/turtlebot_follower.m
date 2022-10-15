@@ -11,7 +11,15 @@ classdef turtlebot_follower
         MarkerImg;
         Intrinsics;
         MarkerSize = 0.09;
+        % for SetGoalPose
         Distance = 0.2;
+        % for DetermineCmdVelocity
+        endPositionError = 0.5;
+        endOrientationError = 2;
+        % for SetRefPose
+        changeInDistance = 0.01;
+        changeInAngle = 5;
+
     end
     methods
         function obj = turtlebot_follower()
@@ -89,7 +97,7 @@ classdef turtlebot_follower
         function refPose = SetRefPose(obj, pose, i)
             % map the pose taken from image analysis whenever it moves 0.3m
             % from its last position OR whenever it turns
-            changeInDistance = 0.01;
+            
             
             % save the first pose for comparison
             if i==0
@@ -100,7 +108,7 @@ classdef turtlebot_follower
             end
 
             if i==1
-                if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= changeInDistance
+                if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= obj.changeInDistance
                     refPose = pose;
                     i = 4;
                     disp("translation")
@@ -116,7 +124,7 @@ classdef turtlebot_follower
                 anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
                 thetaPose = rad2deg(anglesPose(1));
 
-                if abs(thetaFirst-thetaPose)>5
+                if abs(thetaFirst-thetaPose)>obj.changeInAngle
                     secondPose = pose;
                     i = 2;
                     disp("second pose")
@@ -195,11 +203,12 @@ classdef turtlebot_follower
             if isnan(currentDistance)
                 cmdVel = [0 0 0 0 0 0];
                 disp("Invalid data - Stop")              
-            elseif abs(xDiff)<0.05 && abs(yDiff)<0.05
-                if abs(thetaGoal-thetaCurrent)<2
+            elseif abs(xDiff)<obj.endPositionError && abs(yDiff)<obj.endPositionError
+                if abs(thetaGoal-thetaCurrent)<obj.endOrientationError
                     % at goal and facing correct direction
                     % do nothing
                     cmdVel = [0 0 0 0 0 0];
+                    i=0;
                     disp("!!! At goal !!!")
                 else
                     % at goal and not facing correct direction
@@ -208,7 +217,7 @@ classdef turtlebot_follower
                     disp("Final spin")
                 end
             else
-                if abs(thetaGoal-thetaCurrent)<1
+                if abs(thetaGoal-thetaCurrent)<obj.endOrientationError
                     % facing direction of goal but not there yet
                     % drive towards goal
                     cmdVel = [direction2*0.1 0 0 0 0 0];
