@@ -14,21 +14,21 @@ find_package(catkin REQUIRED COMPONENTS
 
 # Declaring the dependencies for packages that depend on this package.
 catkin_package(
-  INCLUDE_DIRS include/turtlebot_follower
+  # INCLUDE_DIRS include/turtlebot_follower
   CATKIN_DEPENDS roscpp rospy std_msgs
 )
 
 # Add the given directories to those the compiler uses to search for include files. 
 # So nothing but giving the location of the include files
-include_directories(
-  include/turtlebot_follower
-  ${catkin_INCLUDE_DIRS}
-)
+# include_directories(
+#   include/turtlebot_follower
+#   ${catkin_INCLUDE_DIRS}
+# )
 
 # Adding the executable files for the build
-add_executable(${PROJECT_NAME}_node src/turtlebot_follower.cpp src/turtlebot_follower_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/turtlebot_follower.cpp src/turtlebot_follower_node.cpp)
 
 # linking the libraries for successful binary genertion
-target_link_libraries(${PROJECT_NAME}_node
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(${PROJECT_NAME}_node
+#   ${catkin_LIBRARIES}
+# )
