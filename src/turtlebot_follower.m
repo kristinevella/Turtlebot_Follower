@@ -12,7 +12,7 @@ classdef turtlebot_follower
         Intrinsics;
         MarkerSize = 0.09;
         % for SetGoalPose
-        Distance = 0.2;
+        Distance = 0.8;
         % for DetermineCmdVelocity
         endPositionError = 0.5;
         endOrientationError = 2;
@@ -47,7 +47,7 @@ classdef turtlebot_follower
             timer = 5;
             readAprilTagTime = timer;
             markerPresent = 0;
-            i = 0;
+            poseType = 0;
             %reset(r);
             
             while followLeader
@@ -76,8 +76,8 @@ classdef turtlebot_follower
 %                     leaderPose = currentLeaderPose.Pose.Pose;
 
                     % Move towards the marker
-                    refPose = SetRefPose(obj, pose, i);
-                    goalPose = DetermineGoalPose(obj, refPose);
+                    refPose = SetRefPose(obj, pose, poseType);
+                    goalPose = DetermineGoalPose(obj, refPose, poseType);
                     cmdVel = DetermineCmdVelocity(obj, refPose, goalPose, robotPose); 
                     PublishCmdVelocity(obj, cmdVel);
                 else
@@ -94,23 +94,23 @@ classdef turtlebot_follower
             end
         end
 
-        function refPose = SetRefPose(obj, pose, i)
+        function refPose = SetRefPose(obj, pose, poseType)
             % map the pose taken from image analysis whenever it moves 0.3m
             % from its last position OR whenever it turns
             
             
             % save the first pose for comparison
-            if i==0
+            if poseType==0
                 firstPose = pose;
                 refPose = pose;
-                i = 1;
+                poseType = 1;
                 disp("first pose")
             end
 
-            if i==1
+            if poseType==1
                 if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= obj.changeInDistance
                     refPose = pose;
-                    i = 4;
+                    poseType = 3;
                     disp("translation")
                 end
 
@@ -126,12 +126,12 @@ classdef turtlebot_follower
 
                 if abs(thetaFirst-thetaPose)>obj.changeInAngle
                     secondPose = pose;
-                    i = 2;
+                    poseType = 2;
                     disp("second pose")
                 end
             end
 
-            if i==2
+            if poseType==2
                 % difference in angle between second and third pose
                 % less than 2 degrees
                 quatSecond = secondPose.Orientation;
@@ -145,7 +145,7 @@ classdef turtlebot_follower
 
                 if abs(thetaThird-thetaSecond)<2
                     refPose = pose;
-                    i = 4;
+                    poseType = 4;
                     disp("rotation")
                 else
                     secondPose = thirdPose;
@@ -208,7 +208,7 @@ classdef turtlebot_follower
                     % at goal and facing correct direction
                     % do nothing
                     cmdVel = [0 0 0 0 0 0];
-                    i=0;
+                    poseType=0;
                     disp("!!! At goal !!!")
                 else
                     % at goal and not facing correct direction
@@ -231,7 +231,7 @@ classdef turtlebot_follower
             end
         end
 
-        function goalPose = DetermineGoalPose(obj, pose)
+        function goalPose = DetermineGoalPose(obj, pose, poseType)
             % pose = pose from AR Tag
             % translate this pose to be about 0.5m away from leader turtlebot
             
@@ -245,12 +245,20 @@ classdef turtlebot_follower
 
             % convert from rigid3d to ros Pose
             goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
-            goalPose.Position.X = pose.Position.X+translate_x;
-            goalPose.Position.Y = pose.Position.Y+translate_y;
-            goalPose.Position.Z = pose.Position.Z;
-%             goalPose.Orientation = rotm2quat(pose(1:3,1:3));  % Add back
-%             in later when using AnalyseImage
-            goalPose.Orientation = pose.Orientation;
+            if poseType==3
+                    goalPose.Position.X = pose.Position.X+translate_x;
+                    goalPose.Position.Y = pose.Position.Y+translate_y;
+            elseif poseType==4
+                    goalPose.Position.X = pose.Position.X;
+                    goalPose.Position.Y = pose.Position.Y;
+            end
+
+                goalPose.Position.Z = pose.Position.Z;
+    %             goalPose.Orientation = rotm2quat(pose(1:3,1:3));  % Add back
+    %             in later when using AnalyseImage
+                goalPose.Orientation = pose.Orientation;
+            
+            
         end
 
         function [markerPresent,worldPose] = AnalyseImage(obj, rgbImgMsg, depthMsg, robotPose)
@@ -259,9 +267,9 @@ classdef turtlebot_follower
 
             % adjust the image to allow for easier detection
             refinedImage = imadjust(grayImage);
-            refinedImage = imlocalbrighten(refinedImage);
-            refinedImage(refinedImage >= 10) = 255; % make grey pixels white to increase contrast
-            %imshow(refinedImage);
+%             refinedImage = imlocalbrighten(refinedImage);
+            refinedImage(refinedImage >= 5) = 255; % make grey pixels white to increase contrast
+%             imshow(refinedImage);
 
             % april tag     
             I = undistortImage(rgbImg,obj.Intrinsics,OutputView="same");
