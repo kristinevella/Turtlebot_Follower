@@ -14,7 +14,7 @@ classdef turtlebot_follower
         % for SetGoalPose
         Distance = 0.7;
         % for DetermineCmdVelocity
-        endPositionError = 0.05;
+        endPositionError = 0.1;
         endOrientationError = 2;
         % for SetRefPose
         changeInDistance = 0.01;
@@ -238,12 +238,12 @@ classdef turtlebot_follower
                 if abs(thetaGoal-thetaCurrent)<obj.endOrientationError
                     % facing direction of goal but not there yet
                     % drive towards goal
-                    cmdVel = [direction2*k 0 0 0 0 0];
+                    cmdVel = [direction2*0.2*k 0 0 0 0 0];
                     disp("Drive to goal")
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
-                    cmdVel = [0 0 0 0 0 direction1*k];
+                    cmdVel = [0 0 0 0 0 direction1*0.2*k];
                     disp("Face goal")
                 end
             end
@@ -251,12 +251,16 @@ classdef turtlebot_follower
 
         function k = VelocityController(obj, currentDistance)
             distanceToGoal = abs(currentDistance-obj.Distance);
-            if distanceToGoal>0.1
-                k = 0.1;
+            if distanceToGoal>1
+                k = 1;
+            elseif distanceToGoal>0.7
+                k = 0.75;
             elseif distanceToGoal>0.5
-                k = 0.05;
+                k = 0.3;
             elseif distanceToGoal>0.2
-                k = 0.01;
+                k = 0.25;
+            else
+                k = 0.25;
             end
         end
 
