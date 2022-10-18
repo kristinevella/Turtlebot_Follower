@@ -12,9 +12,9 @@ classdef turtlebot_follower
         Intrinsics;
         MarkerSize = 0.09;
         % for SetGoalPose
-        Distance = 0.8;
+        Distance = 0.7;
         % for DetermineCmdVelocity
-        endPositionError = 0.5;
+        endPositionError = 0.05;
         endOrientationError = 2;
         % for SetRefPose
         changeInDistance = 0.01;
@@ -48,6 +48,9 @@ classdef turtlebot_follower
             readAprilTagTime = timer;
             markerPresent = 0;
             poseType = 0;
+            refPose = 0;
+            firstPose = 0;
+            secondPose = 0;
             %reset(r);
             
             while followLeader
@@ -76,9 +79,9 @@ classdef turtlebot_follower
 %                     leaderPose = currentLeaderPose.Pose.Pose;
 
                     % Move towards the marker
-                    refPose = SetRefPose(obj, pose, poseType);
+                    [refPose, poseType, firstPose, secondPose] = SetRefPose(obj, pose, poseType, refPose, firstPose, secondPose);
                     goalPose = DetermineGoalPose(obj, refPose, poseType);
-                    cmdVel = DetermineCmdVelocity(obj, refPose, goalPose, robotPose); 
+                    [cmdVel, poseType] = DetermineCmdVelocity(obj, refPose, poseType, goalPose, robotPose); 
                     PublishCmdVelocity(obj, cmdVel);
                 else
                     velocities = [0,0,0,0,0,0];
@@ -94,7 +97,7 @@ classdef turtlebot_follower
             end
         end
 
-        function refPose = SetRefPose(obj, pose, poseType)
+        function [refPose, poseType, firstPose, secondPose] = SetRefPose(obj, pose, poseType, refPose, firstPose, secondPose)
             % map the pose taken from image analysis whenever it moves 0.3m
             % from its last position OR whenever it turns
             
@@ -108,12 +111,7 @@ classdef turtlebot_follower
             end
 
             if poseType==1
-                if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= obj.changeInDistance
-                    refPose = pose;
-                    poseType = 3;
-                    disp("translation")
-                end
-
+                
                 % difference in angle between first and current pose
                 % more than 5 degrees
                 quatFirst = firstPose.Orientation;
@@ -124,11 +122,25 @@ classdef turtlebot_follower
                 anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
                 thetaPose = rad2deg(anglesPose(1));
 
-                if abs(thetaFirst-thetaPose)>obj.changeInAngle
+                if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= obj.changeInDistance
+                    refPose = pose;
+                    firstPose = firstPose;
+                    secondPose = secondPose;
+                    poseType = 3;
+                    disp("translation")                
+
+                elseif abs(thetaFirst-thetaPose)>obj.changeInAngle % in progress of turning
+                    refPose = refPose;
+                    firstPose = firstPose;
                     secondPose = pose;
                     poseType = 2;
                     disp("second pose")
+                else
+                    refPose = pose;
+                    firstPose = firstPose;
+                    secondPose = secondPose;
                 end
+
             end
 
             if poseType==2
@@ -145,17 +157,22 @@ classdef turtlebot_follower
 
                 if abs(thetaThird-thetaSecond)<2
                     refPose = pose;
+                    firstPose = firstPose;
+                    secondPose = secondPose;
                     poseType = 4;
                     disp("rotation")
                 else
+                    refPose = refPose;
+                    firstPose = firstPose;
                     secondPose = thirdPose;
                     disp("third pose")
                 end
             end
         end
 
-        function cmdVel = DetermineCmdVelocity(obj, pose, goalPose, currentPose)
+        function [cmdVel, poseType] = DetermineCmdVelocity(obj, pose, poseType, goalPose, currentPose)
             cmdVel = [0 0 0 0 0 0];
+            poseType = poseType;
 
             % display goal transform & pose
             goalPoseTr = quat2rotm([goalPose.Orientation.W goalPose.Orientation.X goalPose.Orientation.Y goalPose.Orientation.Z]);
@@ -182,7 +199,7 @@ classdef turtlebot_follower
             yDiff = abs(goalPose.Position.Y - currentPose.Position.Y)
             angularError = rad2deg(atan2(yDiff,xDiff));
             direction1 = (angularError-thetaCurrent)/(abs(angularError-thetaCurrent));
-            currentDistance = (pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2 
+            currentDistance = sqrt((pose.Position.X-currentPose.Position.X)^2+(pose.Position.Y-currentPose.Position.Y)^2) 
             if currentDistance >= obj.Distance
                 direction2 = 1;
             else
@@ -217,17 +234,29 @@ classdef turtlebot_follower
                     disp("Final spin")
                 end
             else
+                k = VelocityController(obj, currentDistance);
                 if abs(thetaGoal-thetaCurrent)<obj.endOrientationError
                     % facing direction of goal but not there yet
                     % drive towards goal
-                    cmdVel = [direction2*0.1 0 0 0 0 0];
+                    cmdVel = [direction2*k 0 0 0 0 0];
                     disp("Drive to goal")
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
-                    cmdVel = [0 0 0 0 0 direction1*0.1];
+                    cmdVel = [0 0 0 0 0 direction1*k];
                     disp("Face goal")
                 end
+            end
+        end
+
+        function k = VelocityController(obj, currentDistance)
+            distanceToGoal = abs(currentDistance-obj.Distance);
+            if distanceToGoal>0.1
+                k = 0.1;
+            elseif distanceToGoal>0.5
+                k = 0.05;
+            elseif distanceToGoal>0.2
+                k = 0.01;
             end
         end
 
@@ -245,7 +274,7 @@ classdef turtlebot_follower
 
             % convert from rigid3d to ros Pose
             goalPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
-            if poseType==3
+            if poseType==3 || poseType==1
                     goalPose.Position.X = pose.Position.X+translate_x;
                     goalPose.Position.Y = pose.Position.Y+translate_y;
             elseif poseType==4
