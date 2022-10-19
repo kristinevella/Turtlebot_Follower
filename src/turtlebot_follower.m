@@ -116,11 +116,11 @@ classdef turtlebot_follower
                 % more than 5 degrees
                 quatFirst = firstPose.Orientation;
                 anglesFirst = quat2eul([quatFirst.W quatFirst.X quatFirst.Y quatFirst.Z]);
-                thetaFirst = rad2deg(anglesFirst(1));
+                thetaFirst = rad2deg(anglesFirst(2)); %use roll instead of yaw to determine yaw
 
                 quatPose = pose.Orientation;
                 anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
-                thetaPose = rad2deg(anglesPose(1));
+                thetaPose = rad2deg(anglesPose(2));
 
                 if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= obj.changeInDistance
                     refPose = pose;
@@ -148,12 +148,12 @@ classdef turtlebot_follower
                 % less than 2 degrees
                 quatSecond = secondPose.Orientation;
                 anglesSecond = quat2eul([quatSecond.W quatSecond.X quatSecond.Y quatSecond.Z]);
-                thetaSecond = rad2deg(anglesSecond(1));
+                thetaSecond = rad2deg(anglesSecond(2));
 
                 thirdPose = pose;
                 quatThird = thirdPose.Orientation;
                 anglesThird = quat2eul([quatThird.W quatThird.X quatThird.Y quatThird.Z]);
-                thetaThird = rad2deg(anglesThird(1));
+                thetaThird = rad2deg(anglesThird(2));
 
                 if abs(thetaThird-thetaSecond)<2
                     refPose = pose;
@@ -207,7 +207,8 @@ classdef turtlebot_follower
             end
             direction3 = (thetaGoal-thetaCurrent)/(abs(thetaGoal-thetaCurrent));
             
-            % do we need this angular error value ??
+            % do we need this angular error value ?? angular error the angle
+            % towards the goalPose if its not directly in front of it
             % if goal is behind it dont spin all the way around
             if (angularError/thetaCurrent)/(abs(angularError/thetaCurrent))<0 
                 if angularError>0
@@ -235,15 +236,16 @@ classdef turtlebot_follower
                 end
             else
                 k = VelocityController(obj, currentDistance);
+                disp(k)
                 if abs(thetaGoal-thetaCurrent)<obj.endOrientationError
                     % facing direction of goal but not there yet
                     % drive towards goal
-                    cmdVel = [direction2*0.2*k 0 0 0 0 0];
+                    cmdVel = [direction2*k 0 0 0 0 0];
                     disp("Drive to goal")
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
-                    cmdVel = [0 0 0 0 0 direction1*0.2*k];
+                    cmdVel = [0 0 0 0 0 direction1*0.1];
                     disp("Face goal")
                 end
             end
@@ -251,16 +253,14 @@ classdef turtlebot_follower
 
         function k = VelocityController(obj, currentDistance)
             distanceToGoal = abs(currentDistance-obj.Distance);
-            if distanceToGoal>1
-                k = 1;
-            elseif distanceToGoal>0.7
-                k = 0.75;
-            elseif distanceToGoal>0.5
-                k = 0.3;
+            if distanceToGoal>0.7
+                k = 0.9;
+            elseif distanceToGoal>0.3
+                k = 0.8;
             elseif distanceToGoal>0.2
-                k = 0.25;
+                k = 0.3;
             else
-                k = 0.25;
+                k = 0.1;
             end
         end
 
@@ -271,7 +271,7 @@ classdef turtlebot_follower
             % find angle of AR tag
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            theta = angles(1);
+            theta = angles(2);
             % get x,y distance away based on angle
             translate_x = -obj.Distance*cos(theta);
             translate_y = -obj.Distance*sin(theta);
@@ -281,15 +281,17 @@ classdef turtlebot_follower
             if poseType==3 || poseType==1
                     goalPose.Position.X = pose.Position.X+translate_x;
                     goalPose.Position.Y = pose.Position.Y+translate_y;
+                    goalPose.Orientation = pose.Orientation;
             elseif poseType==4
                     goalPose.Position.X = pose.Position.X;
                     goalPose.Position.Y = pose.Position.Y;
+                    quat = eul2quat([theta 0 0]);
+                    goalPose.Orientation = quat;
             end
 
                 goalPose.Position.Z = pose.Position.Z;
     %             goalPose.Orientation = rotm2quat(pose(1:3,1:3));  % Add back
     %             in later when using AnalyseImage
-                goalPose.Orientation = pose.Orientation;
             
             
         end
