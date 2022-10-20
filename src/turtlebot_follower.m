@@ -15,10 +15,10 @@ classdef turtlebot_follower
         Distance = 0.7;
         % for DetermineCmdVelocity
         endPositionError = 0.1;
-        endOrientationError = 2;
+        endOrientationError = 5;
         % for SetRefPose
         changeInDistance = 0.01;
-        changeInAngle = 5;
+        changeInAngle = 10;
 
     end
     methods
@@ -181,11 +181,11 @@ classdef turtlebot_follower
             disp("Goal:");
             disp(goalPoseTr);
 
-            poseTr = quat2rotm([pose.Orientation.W pose.Orientation.X pose.Orientation.Y pose.Orientation.Z]);
-            poseTr(4,:) = [0 0 0];
-            poseTr(:,4) = [pose.Position.X; pose.Position.Y; pose.Position.Z; 1];
-            disp("Pose:");
-            disp(poseTr);
+            currentPoseTr = quat2rotm([currentPose.Orientation.W currentPose.Orientation.X currentPose.Orientation.Y currentPose.Orientation.Z]);
+            currentPoseTr(4,:) = [0 0 0];
+            currentPoseTr(:,4) = [currentPose.Position.X; currentPose.Position.Y; currentPose.Position.Z; 1];
+            disp("currentPose:");
+            disp(currentPoseTr);
 
             quatGoal = goalPose.Orientation;
             angles = quat2eul([quatGoal.W quatGoal.X quatGoal.Y quatGoal.Z]);
@@ -231,13 +231,13 @@ classdef turtlebot_follower
                 else
                     % at goal and not facing correct direction
                     % spin to correct direction
-                    cmdVel = [0 0 0 0 0 direction3*0.1];
+                    cmdVel = [0 0 0 0 0 direction3*0.05];
                     disp("Final spin")
                 end
             else
                 k = VelocityController(obj, currentDistance);
                 disp(k)
-                if abs(thetaGoal-thetaCurrent)<obj.endOrientationError
+                if abs(angularError-thetaCurrent)<obj.endOrientationError
                     % facing direction of goal but not there yet
                     % drive towards goal
                     cmdVel = [direction2*k 0 0 0 0 0];
@@ -245,7 +245,7 @@ classdef turtlebot_follower
                 else
                     % not facing direction of goal and not at goal
                     % turn to face goal
-                    cmdVel = [0 0 0 0 0 direction1*0.1];
+                    cmdVel = [0 0 0 0 0 direction1*0.05];
                     disp("Face goal")
                 end
             end
@@ -347,8 +347,8 @@ classdef turtlebot_follower
     
                 centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))];                 
                 I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
-                figure(1);
-                imshow(I);
+                %figure(1);
+                %imshow(I);
        
                 % convert image point to 3d points
                 depthImg = rosReadImage(depthMsg);
@@ -384,6 +384,10 @@ classdef turtlebot_follower
                 poseRM = quat2rotm([quat.W quat.X quat.Y quat.Z]);
 
                 worldPoseTM = pose.Rotation*poseRM;
+                % Swap rotation from y-axis to z-axis
+                angles = rotm2eul(worldPoseTM);
+                swapAxes = [angles(2) 0 0];
+                worldPoseTM = eul2rotm(swapAxes);
                 worldPoseTM(1:4,4) = [robotPose.Position.X+translation(1); robotPose.Position.Y+translation(2); robotPose.Position.Z+translation(3); 1];
 
                 markerPresent = true;
