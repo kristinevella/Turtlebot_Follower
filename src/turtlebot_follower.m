@@ -116,11 +116,11 @@ classdef turtlebot_follower
                 % more than 5 degrees
                 quatFirst = firstPose.Orientation;
                 anglesFirst = quat2eul([quatFirst.W quatFirst.X quatFirst.Y quatFirst.Z]);
-                thetaFirst = rad2deg(anglesFirst(2)); %use roll instead of yaw to determine yaw
+                thetaFirst = rad2deg(anglesFirst(1)); %use roll instead of yaw to determine yaw
 
                 quatPose = pose.Orientation;
                 anglesPose = quat2eul([quatPose.W quatPose.X quatPose.Y quatPose.Z]);
-                thetaPose = rad2deg(anglesPose(2));
+                thetaPose = rad2deg(anglesPose(1));
 
                 if (firstPose.Position.X-pose.Position.X)^2+(firstPose.Position.Y-pose.Position.Y)^2 >= obj.changeInDistance
                     refPose = pose;
@@ -148,12 +148,12 @@ classdef turtlebot_follower
                 % less than 2 degrees
                 quatSecond = secondPose.Orientation;
                 anglesSecond = quat2eul([quatSecond.W quatSecond.X quatSecond.Y quatSecond.Z]);
-                thetaSecond = rad2deg(anglesSecond(2));
+                thetaSecond = rad2deg(anglesSecond(1));
 
                 thirdPose = pose;
                 quatThird = thirdPose.Orientation;
                 anglesThird = quat2eul([quatThird.W quatThird.X quatThird.Y quatThird.Z]);
-                thetaThird = rad2deg(anglesThird(2));
+                thetaThird = rad2deg(anglesThird(1));
 
                 if abs(thetaThird-thetaSecond)<2
                     refPose = pose;
@@ -271,7 +271,7 @@ classdef turtlebot_follower
             % find angle of AR tag
             quat = pose.Orientation;
             angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-            theta = angles(2);
+            theta = angles(1);
             % get x,y distance away based on angle
             translate_x = -obj.Distance*cos(theta);
             translate_y = -obj.Distance*sin(theta);
@@ -321,6 +321,11 @@ classdef turtlebot_follower
                 updatedR = pose.Rotation * tform.Rotation;
                 pose = rigid3d(updatedR, pose.Translation);
 
+                % Swap rotation from x-axis to z-axis
+                angles = rotm2eul(pose.Rotation);
+                swapAxes = [angles(3) angles(2) angles(1)];
+                pose.Rotation = eul2rotm(swapAxes);
+
                 % display tag axis
                 worldPoints = [0 0 0; obj.MarkerSize/2 0 0; 0 obj.MarkerSize/2 0; 0 0 obj.MarkerSize/2];
 
@@ -342,8 +347,8 @@ classdef turtlebot_follower
     
                 centerPoint = [round(mean([uMax uMin])) round(mean([vMax vMin]))];                 
                 I = insertMarker(I,centerPoint,"circle","Size",10,"Color","yellow");
-                %figure(1);
-                %imshow(I);
+                figure(1);
+                imshow(I);
        
                 % convert image point to 3d points
                 depthImg = rosReadImage(depthMsg);
@@ -364,16 +369,22 @@ classdef turtlebot_follower
                     depth * (centerPoint(1)-obj.Intrinsics.PrincipalPoint(1))/obj.Intrinsics.FocalLength(1) ...
                     depth * (centerPoint(2)-obj.Intrinsics.PrincipalPoint(2))/obj.Intrinsics.FocalLength(2)];
 
-                poseM = eul2rotm([0 0 0]); %eul2rotm([-1.57 0 -1.57]); % from camera - see urdf file
-                poseM(1:3,4) = translation';
-                poseM(4,4) = 1;
+%                 poseM = eul2rotm([0 0 -pi/2]); %eul2rotm([-1.57 0 -1.57]); % from camera - see urdf file
+%                 poseM(1:3,4) = translation';
+%                 poseM(4,4) = 1;
     
+%                 quat = robotPose.Orientation;
+%                 worldPoseTr = quat2rotm([quat.W quat.X quat.Y quat.Z]);
+%                 worldPoseTr(1:3,4) = [robotPose.Position.X;robotPose.Position.Y;robotPose.Position.Z];
+%                 worldPoseTr(4,4) = 1;
+    
+%                 worldPoseTM = worldPoseTr * poseM;
+
                 quat = robotPose.Orientation;
-                worldPoseTr = quat2rotm([quat.W quat.X quat.Y quat.Z]);
-                worldPoseTr(1:3,4) = [robotPose.Position.X;robotPose.Position.Y;robotPose.Position.Z];
-                worldPoseTr(4,4) = 1;
-    
-                worldPoseTM = worldPoseTr * poseM;
+                poseRM = quat2rotm([quat.W quat.X quat.Y quat.Z]);
+
+                worldPoseTM = pose.Rotation*poseRM;
+                worldPoseTM(1:4,4) = [robotPose.Position.X+translation(1); robotPose.Position.Y+translation(2); robotPose.Position.Z+translation(3); 1];
 
                 markerPresent = true;
                 disp("Marker detected at");
