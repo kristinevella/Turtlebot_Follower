@@ -201,6 +201,7 @@ classdef turtlebot_follower_test
         end
 
         function goalPose = DetermineGoalPose(obj, pose)
+            theta = GetTheta(obj, pose);
             % pose = pose from AR Tag
             % get x,y distance away based on angle
             translate_x = -obj.Distance*cos(theta);
