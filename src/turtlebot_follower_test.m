@@ -18,7 +18,7 @@ classdef turtlebot_follower_test
         endOrientationError = 5;
         % for SetRefPose
         changeInDistance = 0.01;
-        changeInAngle = 10;
+        changeInAngle = 20;
 
     end
     methods
@@ -76,6 +76,8 @@ classdef turtlebot_follower_test
                             poseType = 2;
                             disp("translation")
 
+                            thetaFirstSecond = abs(thetaFirst-thetaSecond)
+
                         elseif abs(thetaFirst-thetaSecond)>obj.changeInAngle % in progress of turning
                             poseType = 3;
                             disp("rotation")
@@ -92,7 +94,7 @@ classdef turtlebot_follower_test
                     robotPose = currentOdom.Pose.Pose;
 
                     % Find distance between AR tag and follower
-                    distanceToLeader = GetDistance(obj, robotPose, secondPose);
+                    distanceToLeader = GetDistance(obj, robotPose, secondPose)
 
                     % determine direction
                     if distanceToLeader >= obj.Distance
@@ -102,8 +104,8 @@ classdef turtlebot_follower_test
                     end
 
                     % Find how far to the goal pose
-                    goalPose = DetermineGoalPose(obj, secondPose);
-                    distanceToGoal = GetDistance(obj, robotPose, goalPose);
+                    % goalPose = DetermineGoalPose(obj, secondPose);
+                    distanceToGoal = abs(distanceToLeader-obj.Distance);
 
                     k = VelocityController(obj, distanceToGoal);
                     % close the gap
@@ -114,6 +116,7 @@ classdef turtlebot_follower_test
                         PublishCmdVelocity(obj, [0 0 0 0 0 0]);
                         poseType = 0;
                         disp("goal reached")
+                        pause(3); %wait for rolling to stop
                     end
 
                 end
@@ -144,11 +147,20 @@ classdef turtlebot_follower_test
                             currentOdom = OdomCallback(obj);
                             robotPose = currentOdom.Pose.Pose;
                             [markerPresent, pose] = AnalyseImage(obj, robotPose);
-                            if markerPresent && ~isnan(pose.Position.X)
+                            
+                            if markerPresent && ~isnan(pose.Position.X)                                
                                 startPose = robotPose;
                                 fourthPose = pose;
-
+                                poseType = 5;
+                            end
+                            while poseType==5
                                 % Check if its moved away (if not stay in place and keep checking)
+                                currentOdom = OdomCallback(obj);
+                                robotPose = currentOdom.Pose.Pose;
+                                [markerPresent, pose] = AnalyseImage(obj, robotPose);
+                                if markerPresent && ~isnan(pose.Position.X) 
+                                    fourthPose = pose;
+                                end
                                 translationDistance = GetDistance(obj, thirdPose, fourthPose);
                                 if translationDistance >= obj.changeInDistance
                                     robotPose = currentOdom.Pose.Pose;
@@ -157,21 +169,25 @@ classdef turtlebot_follower_test
 
                                     % move 0.7m forward and turn 45 degrees
                                     moveDistance = GetDistance(obj, startPose, robotPose);
-                                    while moveDistance <= obj.Distance
+                                    if moveDistance <= obj.Distance
                                         distanceToGoal = abs(obj.Distance - moveDistance);
                                         k = VelocityController(obj, distanceToGoal);
                                         direction = 1; %forward
                                         PublishCmdVelocity(obj, [direction*k 0 0 0 0 0]);
                                         disp("Drive to turning spot")
                                     end
-                                    while abs(thetaStart-thetaRobot)<=45
+                                    if abs(thetaStart-thetaRobot)<=45 && moveDistance>obj.Distance
                                         robotPose = currentOdom.Pose.Pose;
                                         thetaRobot = GetTheta(obj, robotPose);
-                                        PublishCmdVelocity(obj, [0 0 0 0 0 -0.05]);
+                                        PublishCmdVelocity(obj, [0 0 0 0 0 -0.1]);
                                         disp("turn")
+                                        turnedDistance = abs(thetaStart-thetaRobot)
                                     end
+                                    if abs(thetaStart-thetaRobot)>45 && moveDistance>obj.Distance
                                     poseType = 0; % Go find next goal
                                     disp("goal reached")
+                                    PublishCmdVelocity(obj, [0 0 0 0 0 0]);
+                                    end
                                 else
                                     PublishCmdVelocity(obj, [0 0 0 0 0 0]);
                                 end
@@ -190,9 +206,9 @@ classdef turtlebot_follower_test
         function k = VelocityController(obj, currentDistance)
             distanceToGoal = abs(currentDistance-obj.Distance);
             if distanceToGoal>0.7
-                k = 0.9;
+                k = 0.6;
             elseif distanceToGoal>0.3
-                k = 0.8;
+                k = 0.4;
             elseif distanceToGoal>0.2
                 k = 0.3;
             else
@@ -323,7 +339,7 @@ classdef turtlebot_follower_test
 
                 markerPresent = true;
                 disp("Marker detected at");
-                disp(worldPoseTM);
+                disp(worldPoseTM)
 
                 worldPose = rosmessage("geometry_msgs/Pose","DataFormat","struct");
                 worldPose.Position.X = worldPoseTM(1,4);
