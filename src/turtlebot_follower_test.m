@@ -201,6 +201,7 @@ classdef turtlebot_follower_test
                     followLeader = false;
                 end
             end
+            PublishCmdVelocity(obj, [0 0 0 0 0 0]);
         end
 
         function k = VelocityController(obj, currentDistance)
